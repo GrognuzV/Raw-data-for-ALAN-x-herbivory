@@ -1,0 +1,6008 @@
+---
+title: "23 - 011 ALAN x HERBIVORY"
+author: "VINCENT GROGNUZ"
+date: "30/11/2023"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# 00 / HOME DIRECTORY 
+
+```{r 00 HOME DIRECTORY, echo = TRUE, warning = FALSE, message = FALSE}
+# REMOVE ALL OBJECT FROM R-WORKING SPACE
+rm(list=ls()) 
+
+# EMPTY THE GARBAGE
+gc()
+
+# MAKE A NEW LOCAL DIRECTORY ON YOUR MACHINE IN WHICH R WILL LOOK FOR THIS ANALYSIS AND WILL EXPORT GRAPHS & CO.
+DIRECTORY = "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/06_ANALYSIS/2023/"
+HOME = paste0(DIRECTORY, "01_ALAN x HERBIVORY/OUTPUT")
+rm(DIRECTORY)
+
+# CHECK IF THAT DIRECTORY EXIST
+file.exists(HOME)
+
+# MAKE HOME OUR WORK DIRECTORY, THE DEFAULT FOLDER IN WHICH R WILL LOOK
+setwd(HOME)
+```
+
+# 00 / LIBRARY   
+
+```{r 00 LIBRARY, echo = TRUE, warning = FALSE, message = FALSE}
+# I NEVER REMEMBER WHICH PACKAGES I USE. I ALWAYS LOAD THEM ALL....
+
+library("RColorBrewer")
+library("stringr")
+# library("stringi")
+# library("tidyverse")
+library("ggplot2")
+library("ggpubr")
+library("data.table")
+library("dplyr")
+# library("plyr")           # LOAD MULTIPLE CSV TABLES
+# library("readr")
+library("lubridate")
+library("wesanderson")  # Color palettes 1
+library("RColorBrewer") # Color palettes 2
+# library("maptools")     # Import .shp and work with it
+# library("spatstat")     # Import .shp and work with it
+# library("rgdal")        # Deal with .shp
+# library("rgeos")        # Deal with .shp
+# library("installr")
+# library("terra")
+# library("raster")
+library("gridExtra")
+library("grid")
+library("gridExtra")    # MERGE DIFFERENT GGPLOT
+library("ggcorrplot")   # PEARSON CORRELATION PLOT
+library("reshape2")
+# library("rmarkdown")
+# library("ggfortify")    # GLM OUTPUT WITH GGPLOT
+library("pscl")         # ZERO INFLATED MODELS
+# library("lmtest")       # LOGLIKELIHOOD TEST
+# library("MASS")         # GLM.NB
+library("lme4")         # glmer
+# library("nlme")         # lme
+# library("glmmADMB")
+library("GLMMadaptive")
+# library("FactoMineR")   # Compute MCA
+# library("factoextra")   # Visualize MCA
+# library("piecewiseSEM")
+# library("lavaan")
+# library("semEff")
+library("ggpattern")
+library("rlist")
+library("Hmisc")
+library("piecewiseSEM")
+library("multcompView")
+library("knitr")
+library("arm")
+library("stargazer")
+library("png")
+library("patchwork")
+library("gtsummary")
+library("broom.mixed")
+library("car")
+# library("ggstats")
+library("gt")
+library("webshot2")
+library("sjPlot")
+library("glmmTMB")
+library("ggsurvfit")
+library("survival")
+
+```
+
+# 00 / LOAD DATA 
+
+```{r 00 LOAD DATA, echo = TRUE, warning = FALSE, message = FALSE}
+
+# LOAD DATA
+###########
+
+# STUDY SITES
+#------------
+STUDY_SITES <- read.csv(
+  "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/07_GIS/03_FIELDS/2023/2023_STUDY SITES.csv",
+  header = F)
+
+STUDY_SITES.ls <- unique(STUDY_SITES$V1)
+
+LIT.SITE <- c("QUAIL", "DEER", "EAGLE", "GRASS SNAKE", "HORNET", "MARTEN", "TOAD", "WOODPECKER")
+DARK.SITE <- c("UPUPA", "CHAMOIS", "PEREGRINE", "LIZARD", "ANTS", "BADGER", "NEWT", "YELLOWHAMMER", "YELLOW HAMMER")
+
+LIT.SITE.22 <- c("ANTS", "DEER", "OAK", "PIZZA", "RABBIT", "STORK")
+DARK.SITE.22 <- c("BADGER", "VOLE", "JUNGLE", "FOX", "TRAIN II", "KINGFISHER", "ZZ_ANTS II", "ZZ_BADGER II", 
+                  "ZZ_BADGER III", "ZZ_DEER II", "ZZ_DEER III", "ZZ_DEER IV", "ZZ_FOX II", "ZZ_KINGFISHER II", 
+                  "ZZ_KINGFISHER III", "ZZ_PIZZA II", "ZZ_VULLY", "ZZ_VULLY II")
+
+# With coordinates
+DATADIR = "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2022/"
+STUDY_SITES.coord <- read.csv(paste0(DATADIR,  "00_STUDY SITES/220722_STUDY SITES_COORD.csv"))
+
+# PLANT LIST
+#-----------
+PLANTS <- read.csv(
+  "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/07_GIS/03_FIELDS/2023/2023_PLANTS.csv",
+  header = F)
+
+PLANTS.ls <- unique(PLANTS$V1)
+
+# ABIOTIC - METEO SUISSE PAYERNE
+#-------------------------------
+ABIOTIC.22 <- read.csv(
+  "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2022/2022_ZZ_ABIOTIC/2022_ABIOTIC_PAYERNE.csv",
+  header = T)
+
+ABIOTIC.23 <- read.csv(
+  "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/2023_ZZ_ABIOTIC/2023_ABIOTIC_PAYERNE.csv",
+  header = T)
+
+ABIOTIC <- rbind(ABIOTIC.22, ABIOTIC.23)
+rm(ABIOTIC.22, ABIOTIC.23)
+
+# Mean temperature last 12 hours
+ABIOTIC$TEMP_12H <- NA
+
+for(i in (13:nrow(ABIOTIC))){
+  
+  # i <- 15
+  
+  i.ABIOTIC <- ABIOTIC[((i-11):i),]
+  ABIOTIC$TEMP_12H[i] <- round(mean(i.ABIOTIC$TEMP_2M), 1)
+  
+}
+
+rm(i.ABIOTIC, i)
+
+# SLUGLINGS
+#----------
+DATADIR = "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/"
+DEROCERAS <- read.csv(paste0(DATADIR,  "2023_ZZ_SLUGS WEIGHT/slug_weights_rearranged.csv"))
+rm(DATADIR)
+
+DATADIR <- "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/2023_H_SLUGS/"
+ARYON <- read.csv(paste0(DATADIR,  "2023_H_SLUGS_LAST EXPORT.csv"), sep = ";")
+rm(DATADIR)
+
+DATADIR <- "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/2023_H_SLUGS/2024_BEHAVIOUR/SHIFT TABLES/"
+
+DARK.WEEK02 <- read.csv(paste0(DATADIR,  "DARK.WEEK02.csv"))
+DARK.WEEK03 <- read.csv(paste0(DATADIR,  "DARK.WEEK03.csv"))
+DARK.WEEK04 <- read.csv(paste0(DATADIR,  "DARK.WEEK04.csv"))
+DARK.WEEK05 <- read.csv(paste0(DATADIR,  "DARK.WEEK05.csv"))
+DARK.WEEK06 <- read.csv(paste0(DATADIR,  "DARK.WEEK06.csv"))
+LIT.WEEK02 <- read.csv(paste0(DATADIR,  "LIT.WEEK02.csv"))
+LIT.WEEK03 <- read.csv(paste0(DATADIR,  "LIT.WEEK03.csv"))
+LIT.WEEK04 <- read.csv(paste0(DATADIR,  "LIT.WEEK04.csv"))
+LIT.WEEK05 <- read.csv(paste0(DATADIR,  "LIT.WEEK05.csv"))
+LIT.WEEK06 <- read.csv(paste0(DATADIR,  "LIT.WEEK06.csv"))
+
+SHIFT.TABLE <- rbind(DARK.WEEK02, DARK.WEEK03, DARK.WEEK04, DARK.WEEK05, DARK.WEEK06,
+                     LIT.WEEK02, LIT.WEEK03, LIT.WEEK04, LIT.WEEK05, LIT.WEEK06)
+
+rm(DARK.WEEK02, DARK.WEEK03, DARK.WEEK04, DARK.WEEK05, DARK.WEEK06, LIT.WEEK02, LIT.WEEK03, LIT.WEEK04, LIT.WEEK05, LIT.WEEK06)
+
+# CENTAUREA POTS & HERBIVORY
+#---------------------------
+
+DATADIR = "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/2023_E_HERBIVORY/CENTAUREA_POTS/"
+CEPO <- read.csv(paste0(DATADIR,  "2023_E_HERBIVORY_FINAL_QUANTIFICATION-CLEAN.csv"))
+
+rm(DATADIR)
+
+# TRAITS IN WFS
+#--------------
+DATADIR <- "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/2023_C_TRAITS/TRAITS/00_ALL_TRAITS/"
+TRAITS <- read.csv(paste0(DATADIR,  "C_240124_TRAITS.csv"))
+
+# TRACKPLATES
+#------------
+DATADIR <- "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2022/07_TRACK PLATES/"
+TRACKS.22 <- read.csv(paste0(DATADIR,  "230501_TRACKPLATES.csv"))
+
+DATADIR <- "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/2023_ZZ_TRACKPLATES/"
+TRACKS.23 <- read.csv(paste0(DATADIR,  "2023_TRACKPLATES.csv"))
+
+rm(DATADIR)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# INTERACTION
+#------------
+
+DATADIR <- "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/05_DATA/2023/2023_D_INTERACTIONS/FINAL (2022 + 2023)/"
+INTERACTIONS <- read.csv(paste0(DATADIR,  "INTERACTION.csv"))
+
+SAMPLING.ls <- sort(unique(paste0(INTERACTIONS$SAMPLING[INTERACTIONS$SAMP_TIME == "NIGHT"],
+                             ".",
+                             INTERACTIONS$SEGMENT[INTERACTIONS$SAMP_TIME == "NIGHT"])))
+
+INTERACTIONS.ALL <- INTERACTIONS
+INTERACTIONS <- INTERACTIONS[INTERACTIONS$ART_GROUP %in% c("SLUG", "SNAIL") & INTERACTIONS$SAMP_TIME == "NIGHT",] # 591
+
+rm(DATADIR)
+```
+
+# 01.0 - SLUGLINGS / FORMAT & CO.
+
+```{r 01.0 SLUGLINGS FORMAT AND CO, fig.width=10, message=FALSE, warning=FALSE}
+
+# FORMAT DATA
+#############
+
+# numeric & co.
+#--------------
+DEROCERAS$weight <- as.numeric(DEROCERAS$weight)
+ARYON$WEIGHT <- as.numeric(ARYON$WEIGHT)
+names(DEROCERAS)[names(DEROCERAS) == "ï..batch"] <- "batch"
+
+# Transform date into DOY [Day Of Year]
+DEROCERAS$date <- as.Date(DEROCERAS$date, format = "%d-%m-%y", origin = "01/01/1970")
+DEROCERAS$date_DOY <- yday(DEROCERAS$date)
+ 
+ARYON$DATE <- as.Date(ARYON$DATE, format = "%d.%m.%Y", origin = "01/01/1970")
+ARYON$DATE_DOY <- yday(ARYON$DATE)
+
+# + 365  IF AFTER THE 1st OF JANUARY 2024
+for(i in (1:nrow(ARYON))){
+  
+  ifelse(
+    
+    # ARGUMENT
+    ARYON$DATE_DOY[i] < 250,
+    
+    # IF YES
+    ARYON$DATE_DOY[i] <- ARYON$DATE_DOY[i] + 365,
+    
+    # IF NO
+    ARYON$DATE_DOY[i] <- ARYON$DATE_DOY[i])
+
+}
+
+
+# WEEK NUMBER
+DEROCERAS$WEEK <- as.numeric(strftime(DEROCERAS$date, format = '%V'))
+ARYON$WEEK <- as.numeric(strftime(ARYON$DATE, format = '%V'))
+
+# + 52  IF AFTER THE 1st OF JANUARY
+for(i in (1:nrow(ARYON))){
+  
+  ifelse(
+    
+    # ARGUMENT
+    ARYON$WEEK[i] < 40,
+    
+    # IF YES
+    ARYON$WEEK[i] <- ARYON$WEEK[i] + 52,
+    
+    # IF NO
+    ARYON$WEEK[i] <- ARYON$WEEK[i])
+
+}
+
+##############################################################################################################
+
+# CREATE NEW VARIABLES
+######################
+
+# DEROCERAS / COMPUTE AGE OF THE SLUGLINGS
+#-----------------------------------------
+
+# Create an empty variable for age
+DEROCERAS$age <- NA
+
+# For loop
+for(i in (1:nrow(DEROCERAS))){
+
+  # i <- 3322
+
+  # print(i)
+
+  i.DEROCERAS <- DEROCERAS[i,]
+  i.Slug_ID <- i.DEROCERAS$Slug_ID
+
+  # Find hatching date
+  weight.ls <- DEROCERAS[DEROCERAS$Slug_ID == i.Slug_ID,]
+  i.Hatching_Date <- weight.ls[which(weight.ls$weight == 0),]
+
+  # Add age to the slugling
+  i.age <- i.DEROCERAS$date_DOY - i.Hatching_Date$date_DOY
+  DEROCERAS$age[i] <- i.age
+
+}
+
+# Remove
+rm(i, i.age, i.Slug_ID, weight.ls, i.Hatching_Date, i.DEROCERAS)
+
+# CLEAN
+DEROCERAS <- DEROCERAS[DEROCERAS$age > 0,]
+DEROCERAS <- DEROCERAS[!is.na(DEROCERAS$weight),]
+DEROCERAS <- DEROCERAS[DEROCERAS$age < 125,] # 2120
+
+#-------------------------------------------------------------------------------------------------------------
+
+# ARYON / COMPUTE AGE OF THE SLUGLINGS
+#-------------------------------------
+
+# Create an empty variable for age
+ARYON$AGE <- NA
+
+# For loop
+for(i in (1:nrow(ARYON))){
+
+  # i <- 105
+
+  # print(i)
+
+  i.ARYON <- ARYON[i,]
+  i.Slug_ID <- i.ARYON$LABEL
+
+  # Find hatching date
+  weight.ls <- ARYON[ARYON$LABEL == i.Slug_ID,]
+  
+  # FIND ANY MISTAKES
+  #------------------
+  
+  ifelse(
+    
+    # ARGUMENT
+    "BORN" %in% weight.ls$LIFE,
+
+  # IF YES
+    { i.Hatching_Date <- weight.ls[which(weight.ls$LIFE == "BORN"),]
+      i.age <- i.ARYON$DATE_DOY - i.Hatching_Date$DATE_DOY
+      ARYON$AGE[i] <- i.age},
+
+    # IF NO
+    print(paste0(unique(weight.ls$LABEL), " has no birth date"))
+  
+  )
+
+}
+
+# Remove
+rm(i, i.age, i.Slug_ID, weight.ls, i.Hatching_Date, i.ARYON)
+
+##############################################################################################################
+
+# MORTALITY RATES - DEROCERAS
+#############################
+
+# FORMAT
+#-------
+
+# SLUGLINGS AGE (WEEK)
+DEROCERAS$age_week <- NA
+
+DEROCERAS.new <- DEROCERAS[1,]
+
+for(i in (unique(DEROCERAS$Slug_ID))){
+  
+  # i <- 23
+  
+  i.DEROCERAS <- DEROCERAS[DEROCERAS$Slug_ID == i,]
+  i.DEROCERAS$age_week <- i.DEROCERAS$WEEK - min(i.DEROCERAS$WEEK)
+  
+  DEROCERAS.new <- rbind(DEROCERAS.new, i.DEROCERAS)
+
+}
+
+# CLEAN
+DEROCERAS.new <- DEROCERAS.new[-1,]
+DEROCERAS <- DEROCERAS.new
+
+# EMPTY DATA FRAME
+DEROCERAS.MORT <- data.frame(
+  "WEEK" = 9999,
+  "LIGHT_TRMT" = 9999,
+  "N_WEEK_BEF" = 9999,
+  "N_WEEK" = 9999,
+  "MORTALITY" = 9999)
+
+for(i in ((min(DEROCERAS$age_week) + 1):max(DEROCERAS$age_week))){
+  
+  # i <- 6
+  
+  i.DEROCERAS.MORT <- NA
+  
+  i.WEEK.DARK <- i
+  i.WEEK.LIGHT <- i
+  i.WEEK <- rbind(i.WEEK.DARK, i.WEEK.LIGHT)
+  
+  i.LIGHT_TRMT.DARK <- "DARK"
+  i.LIGHT_TRMT.LIGHT <- "LIGHT"
+  i.LIGHT_TRMT <- rbind(i.LIGHT_TRMT.DARK, i.LIGHT_TRMT.LIGHT)
+  
+  i.N_WEEK_BEF.DARK <- as.numeric(nrow(DEROCERAS[DEROCERAS$age_week == (i-1) & DEROCERAS$treatment == "dark",])) 
+  i.N_WEEK_BEF.LIGHT <- as.numeric(nrow(DEROCERAS[DEROCERAS$age_week == (i-1) & DEROCERAS$treatment == "light",]))
+  i.N_WEEK_BEF <- rbind(i.N_WEEK_BEF.DARK, i.N_WEEK_BEF.LIGHT)
+
+  i.N_WEEK.DARK <- as.numeric(nrow(DEROCERAS[DEROCERAS$age_week == i & DEROCERAS$treatment == "dark",])) 
+  i.N_WEEK.LIGHT <- as.numeric(nrow(DEROCERAS[DEROCERAS$age_week == i & DEROCERAS$treatment == "light",]))
+  i.N_WEEK <- rbind(i.N_WEEK.DARK, i.N_WEEK.LIGHT)
+  
+  i.MORTALITY.DARK <- 100 - round(i.N_WEEK.DARK / i.N_WEEK_BEF.DARK, 3) * 100
+  i.MORTALITY.LIGHT <- 100 - round(i.N_WEEK.LIGHT / i.N_WEEK_BEF.LIGHT, 3) * 100
+  i.MORTALITY <- rbind(i.MORTALITY.DARK, i.MORTALITY.LIGHT)
+  
+  i.DEROCERAS.MORT <- as.matrix(cbind(i.WEEK, i.LIGHT_TRMT, i.N_WEEK_BEF, i.N_WEEK, i.MORTALITY))
+  colnames(i.DEROCERAS.MORT) <- c("WEEK", "LIGHT_TRMT", "N_WEEK_BEF", "N_WEEK", "MORTALITY")
+  
+  DEROCERAS.MORT <- rbind(DEROCERAS.MORT, i.DEROCERAS.MORT)
+  
+}
+
+# CLEAN
+DEROCERAS.MORT <- DEROCERAS.MORT[-1,]
+DEROCERAS.MORT$N_WEEK_BEF <- as.numeric(DEROCERAS.MORT$N_WEEK_BEF)
+DEROCERAS.MORT$N_WEEK <- as.numeric(DEROCERAS.MORT$N_WEEK)
+DEROCERAS.MORT$MORTALITY <- as.numeric(DEROCERAS.MORT$MORTALITY)
+DEROCERAS.MORT$WEEK <- as.numeric(DEROCERAS.MORT$WEEK)
+
+# REMOVE
+rm(i.DEROCERAS.MORT, i.WEEK.DARK, i.WEEK.LIGHT, i.WEEK, i.LIGHT_TRMT.DARK, i.LIGHT_TRMT.LIGHT, i.LIGHT_TRMT)
+rm(i.N_WEEK_BEF.DARK, i.N_WEEK_BEF.LIGHT, i.N_WEEK_BEF, i.N_WEEK.DARK, i.N_WEEK.LIGHT, i.N_WEEK)
+rm(i.MORTALITY.DARK, i.MORTALITY.LIGHT, i.MORTALITY, i, i.DEROCERAS, DEROCERAS.new)
+
+# KEPLAN-MEIER
+#-------------
+
+DEROCERAS.KM <- data.frame(
+  "ID" = 9999,
+  "time" = 9999,
+  "status" = 9999,
+  "treatment" = 9999)
+
+for(i in (unique(DEROCERAS$Slug_ID))){
+ 
+  # i <- 23
+  
+  i.DEROCERAS.KM <- DEROCERAS.KM[1,]
+  
+  i.DEROCERAS <- DEROCERAS[DEROCERAS$Slug_ID == i,]  
+
+  i.DEROCERAS.KM$ID <- i
+  i.DEROCERAS.KM$time <- max(i.DEROCERAS$age_week)
+  ifelse(
+    
+    # ARGUMENT
+    i.DEROCERAS.KM$time > 13,
+    
+    # IF YES
+    i.DEROCERAS.KM$status <- 0,
+      
+    # IF NO
+    i.DEROCERAS.KM$status <- 1)
+  
+  i.DEROCERAS.KM$treatment <- unique(i.DEROCERAS$treatment)
+  
+  DEROCERAS.KM <- rbind(DEROCERAS.KM, i.DEROCERAS.KM)
+
+}
+
+DEROCERAS.KM <- DEROCERAS.KM[-1,]
+
+# ONLY KEEP SLUGLINGS THAT SURVIVED AT LEAST 2 WEEKS
+DEROCERAS.KM <- DEROCERAS.KM[DEROCERAS.KM$time > 1,] # 161
+
+rm(i.DEROCERAS, i.DEROCERAS.KM, DEROCERAS.MORT, i)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MORTALITY RATES - ARION
+#########################
+
+# FORMAT
+#-------
+
+# SLUGLINGS AGE (WEEK)
+ARYON$AGE_WEEK <- NA
+
+ARYON.new <- ARYON[1,]
+
+for(i in (unique(ARYON$LABEL))){
+  
+  # i <- "A023"
+  
+  i.ARYON <- ARYON[ARYON$LABEL == i,]
+  i.ARYON$AGE_WEEK <- i.ARYON$WEEK - min(i.ARYON$WEEK)
+  
+  ARYON.new <- rbind(ARYON.new, i.ARYON)
+
+}
+
+# CLEAN
+ARYON.new <- ARYON.new[-1,]
+ARYON <- ARYON.new
+
+# KEPLAN-MEIER
+#-------------
+
+ARYON.KM <- data.frame(
+  "ID" = 9999,
+  "time" = 9999,
+  "status" = 9999,
+  "treatment" = 9999)
+
+LABEL.ls <- unique(ARYON$LABEL)
+LABEL.ls <- LABEL.ls[-length(LABEL.ls)]
+
+for(i in LABEL.ls){
+ 
+  # i <- "A023"
+  
+  i.ARYON.KM <- ARYON.KM[1,]
+  
+  i.ARYON <- ARYON[ARYON$LABEL == i,]  
+
+  i.ARYON.KM$ID <- i
+  i.ARYON.KM$time <- max(i.ARYON$AGE_WEEK)
+  ifelse(
+    
+    # ARGUMENT
+    "DEAD" %in% unique(i.ARYON$LIFE),
+    
+    # IF YES
+    i.ARYON.KM$status <- 1,
+      
+    # IF NO
+    i.ARYON.KM$status <- 0)
+  
+  i.ARYON.KM$treatment <- unique(i.ARYON$TREA)
+  
+  ARYON.KM <- rbind(ARYON.KM, i.ARYON.KM)
+
+}
+
+ARYON.KM <- ARYON.KM[-1,]
+
+# ONLY KEEP SLUGLINGS THAT SURVIVED AT LEAST 2 WEEKS
+ARYON.KM <- ARYON.KM[ARYON.KM$time > 1,] # 161
+
+rm(i.ARYON, i.ARYON.KM, i, LABEL.ls, ARYON.new) # 188
+
+```
+
+# 01.1 - SLUGLINGS / GROWTH & MORTALITY CURVES
+
+```{r 01.1 SLUGLINGS GROWTH CURVES, fig.width = 10, message = FALSE, warning = FALSE}
+
+# 01.11 DEROCERAS - GROWTH CURVE
+################################
+
+COLOR.PALETTE <- c(wes_palettes$Rushmore1[4], wes_palettes$Rushmore1[1])
+SUBSET <- DEROCERAS
+
+# REMOVE SLUGS WITH LESS THAN 3 MEASURMENTS
+KEEP.ls <- NA
+
+for(i in unique(DEROCERAS$Slug_ID)){
+  
+  # i <- 164
+  
+  n.DEROCERAS <- nrow(SUBSET[SUBSET$Slug_ID == i,])
+  
+  ifelse(
+    
+    # ARGUMENT
+    n.DEROCERAS >= 3,
+    
+    # IF YES
+    KEEP.ls <- append(KEEP.ls, i),
+    
+    # IF NO
+    KEEP.ls <- KEEP.ls)
+
+}
+
+KEEP.ls <- KEEP.ls[-1]
+SUBSET <- SUBSET[SUBSET$Slug_ID %in% KEEP.ls,] # 2079
+
+rm(n.DEROCERAS, KEEP.ls)
+
+# MODEL DEROCERAS
+#----------------
+lm.DEROCERAS.exp <- lmer(log(weight) ~ age * treatment + (1|Slug_ID), data = SUBSET)
+
+# PRINT
+#------
+lm.DEROCERAS.exp.tbl <- tbl_regression(lm.DEROCERAS.exp, intercept = T) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**Weight ~ Age * Treatment + (1|Slug ID)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+knit_print(lm.DEROCERAS.exp.tbl)
+# print(lm.DEROCERAS.exp.tbl)
+
+# REMOVE
+rm(lm.DEROCERAS.exp.tbl)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# VISUALIZE
+#----------
+
+# CREATE EMPTY DF
+preddata <- expand.grid(
+              "age" = seq(min(SUBSET$age), max(SUBSET$age, 1)), 
+              "treatment" = as.factor(c("dark", "light")),
+              "Slug_ID" = as.factor(unique(SUBSET$Slug_ID)))
+
+# PREDICT
+preds <- predict(lm.DEROCERAS.exp, newdata = preddata , type = "link", se.fit = TRUE)
+
+critval <- 1.96 ## approx 95% CI
+upr <- preds$fit + (critval * preds$se.fit)
+lwr <- preds$fit - (critval * preds$se.fit)
+fit <- preds$fit
+
+preddata$fit <- exp(fit)
+preddata$lwr <- exp(lwr)
+preddata$upr <- exp(upr)
+
+# MODEL AVERAGING
+#----------------
+
+age.ls <- unique(preddata$age)
+
+for(i in age.ls){
+  
+  # i <- 84
+  
+  preddata.new <- preddata[1:2,]
+  preddata.new[1:2,] <- NA
+  
+  i.preddata <- preddata[preddata$age == i,]
+  
+  fit.dark <- mean(i.preddata$fit[i.preddata$treatment == "dark"])
+  lwr.dark <- mean(i.preddata$lwr[i.preddata$treatment == "dark"])
+  upr.dark <- mean(i.preddata$upr[i.preddata$treatment == "dark"])
+  
+  fit.lit <- mean(i.preddata$fit[i.preddata$treatment == "light"])
+  lwr.lit <- mean(i.preddata$lwr[i.preddata$treatment == "light"])
+  upr.lit <- mean(i.preddata$upr[i.preddata$treatment == "light"])
+  
+  preddata.new$age <- c(i,i)
+  preddata.new$treatment <- c("dark", "light")
+  preddata.new$Slug_ID <- c("Mean", "Mean")
+  preddata.new$fit <- c(fit.dark,fit.lit)
+  preddata.new$lwr <- c(lwr.dark,lwr.lit)
+  preddata.new$upr <- c(upr.dark,upr.lit)
+
+  preddata <- rbind(preddata, preddata.new)
+  
+}
+
+preddata <- preddata[preddata$Slug_ID == "Mean",]
+preddata$age <- as.numeric(preddata$age)
+
+# PLOT
+#-----
+`01.11_GROWTH.points` <- ggplot() +
+
+  # ADD POINTS
+  geom_point(
+    data = SUBSET,
+    aes(
+      x = age,
+      y = weight,
+      colour = treatment,
+      alpha = 0.1)) +
+  
+  # FIT MODELS
+  geom_ribbon(
+    data = preddata,
+    aes(
+      x = age,
+      ymin = lwr,
+      ymax = upr,
+      fill = treatment),
+    alpha = 0.3) +
+  geom_line(
+    data = preddata,
+    aes(
+      x = age,
+      y = fit,
+      colour = treatment,
+      linetype = "bold"),
+    linewidth = 2) +
+  
+  # ADD AESTHETICS...
+  theme_minimal() +
+  labs(
+    x = "Sluglings age [day]",
+    y = "Weight [mg]",
+    colour = "Light treatment",
+    title = "Deroceras reticulatum") +
+  scale_colour_manual(
+    values = COLOR.PALETTE,
+    labels = c("DARK", "LIT")) +
+  scale_fill_manual(
+    values = COLOR.PALETTE) +
+  guides(
+    linetype = "none",
+    alpha = "none",
+    fill = "none",
+    linewidth = "none",
+    colour = "none") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8, angle = 0, hjust = 0.5),
+    axis.title.y = element_text(size = 10, face = "bold"),
+    axis.text.y = element_text(size = 8, angle = 0, hjust = 0.5))
+
+plot(`01.11_GROWTH.points`)
+
+# ggsave(filename = "01.11_GROWTH.points.jpeg",
+#        plot = `01.11_GROWTH.points`, path = HOME,
+#        height = 8, width = 16, units = "cm")
+
+# REMOVE
+rm(fit, lm.DEROCERAS.exp)
+rm(i.preddata, preddata, preddata.new, preds, age.ls, critval, fit.dark, fit.lit, i, lwr, lwr.dark)
+rm(lwr.lit, upr, upr.dark, upr.lit)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# 01.12 DEROCERAS - SURVIVAL ANALYSIS
+#####################################
+
+# PLOT
+`01.12_MORTALITY` <- survfit2(
+  Surv(time, status) ~ treatment,
+  data = DEROCERAS.KM) |>
+  ggsurvfit(
+    linewidth = 1) +
+  add_confidence_interval() +
+  
+  # ADD AESTHETICS...
+  theme_minimal() +
+  labs(
+    x = "Sluglings age [week]",
+    y = "Survival probability",
+    colour = "Light treatment",
+    title = "Deroceras reticulatum") +
+  scale_colour_manual(
+    values = COLOR.PALETTE,
+    labels = c("DARK", "LIT")) +
+  scale_fill_manual(
+    values = COLOR.PALETTE) +
+  coord_cartesian(
+    xlim = c(2, 15)) +
+  guides(
+    fill = "none") +
+  theme(
+    legend.position = c(0.8, 0.85),
+    legend.title = element_text(size = 8, face = "bold"),
+    legend.text = element_text(size = 8, face = "bold"),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8, angle = 0, hjust = 0.5),
+    axis.title.y = element_text(size = 10, face = "bold"),
+    axis.text.y = element_text(size = 8, angle = 0, hjust = 0.5))
+
+plot(`01.12_MORTALITY`)
+
+# TEST
+#-----
+COX.DEROCERAS <- coxph(Surv(time, status) ~ treatment, data = DEROCERAS.KM)
+COX.DEROCERAS.tbl <- tbl_regression(COX.DEROCERAS, exp = TRUE) %>%
+
+  modify_spanning_header(
+    c(estimate, ci, p.value) ~ "**Deroceras reticulatum**") %>%
+
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+  
+knit_print(COX.DEROCERAS.tbl)
+# print(COX.DEROCERAS.tbl)
+
+rm(SUBSET, COX.DEROCERAS, COX.DEROCERAS.tbl)
+rm(DEROCERAS, DEROCERAS.KM)
+
+##############################################################################################################
+
+# 01.13 ARYON - PLOT EXPONENTIAL CURVE
+######################################
+
+# SUBSET
+#-------
+# REMOVE ZEROES
+SUBSET <- ARYON[ARYON$LIFE == "ALIVE",]
+SUBSET <- SUBSET[SUBSET$AGE > 0,]
+SUBSET <- SUBSET[! is.na(SUBSET$AGE),]
+
+# REMOVE SLUGS WITH LESS THAN 3 MEASURMENTS
+KEEP.ls <- NA
+
+for(i in unique(SUBSET$LABEL)){
+  
+  # i <- 123
+  
+  n.ARION <- nrow(SUBSET[SUBSET$LABEL == i,])
+  
+  ifelse(
+    
+    # ARGUMENT
+    n.ARION >= 3,
+    
+    # IF YES
+    KEEP.ls <- append(KEEP.ls, i),
+    
+    # IF NO
+    KEEP.ls <- KEEP.ls)
+
+}
+
+KEEP.ls <- KEEP.ls[-1]
+SUBSET <- SUBSET[SUBSET$LABEL %in% KEEP.ls,]
+
+rm(n.ARION, KEEP.ls)
+
+# MODEL ARION
+#------------
+lm.ARION.exp <- lmer(log(WEIGHT) ~ AGE * TREA + (1|LABEL), data = SUBSET)
+
+# Print
+#------
+lm.ARION.exp.tbl <- tbl_regression(lm.ARION.exp, intercept = T) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**N moves ~ Lux * Time + (1|Week)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+knit_print(lm.ARION.exp.tbl)
+# print(lm.ARION.exp.tbl)
+
+# SAVE
+# gtsave(as_gt(lm.ARION.exp.tbl),
+#        file = file.path(paste0(HOME,"/lm.ARION.exp.tbl")))
+
+# REMOVE
+rm(lm.ARION.exp.tbl)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# VISUALIZE
+#----------
+
+# CREATE EMPTY DF
+preddata <- expand.grid(
+              "AGE" = seq(min(SUBSET$AGE), max(SUBSET$AGE, 1)), 
+              "TREA" = as.factor(c("DARK", "LIGHT")),
+              "LABEL" = as.factor(unique(SUBSET$LABEL)))
+
+# PREDICT
+preds <- predict(lm.ARION.exp, newdata = preddata , type = "link", se.fit = TRUE)
+
+critval <- 1.96 ## approx 95% CI
+upr <- preds$fit + (critval * preds$se.fit)
+lwr <- preds$fit - (critval * preds$se.fit)
+fit <- preds$fit
+
+preddata$fit <- exp(fit)
+preddata$lwr <- exp(lwr)
+preddata$upr <- exp(upr)
+
+# MODEL AVERAGING
+#----------------
+
+AGE.ls <- unique(preddata$AGE)
+
+for(i in AGE.ls){
+  
+  # i <- 84
+  
+  preddata.new <- preddata[1:2,]
+  preddata.new[1:2,] <- NA
+  
+  i.preddata <- preddata[preddata$AGE == i,]
+  
+  fit.dark <- mean(i.preddata$fit[i.preddata$TREA == "DARK"])
+  lwr.dark <- mean(i.preddata$lwr[i.preddata$TREA == "DARK"])
+  upr.dark <- mean(i.preddata$upr[i.preddata$TREA == "DARK"])
+  
+  fit.lit <- mean(i.preddata$fit[i.preddata$TREA == "LIGHT"])
+  lwr.lit <- mean(i.preddata$lwr[i.preddata$TREA == "LIGHT"])
+  upr.lit <- mean(i.preddata$upr[i.preddata$TREA == "LIGHT"])
+  
+  preddata.new$AGE <- c(i,i)
+  preddata.new$TREA <- c("DARK", "LIGHT")
+  preddata.new$LABEL <- c("Mean", "Mean")
+  preddata.new$fit <- c(fit.dark,fit.lit)
+  preddata.new$lwr <- c(lwr.dark,lwr.lit)
+  preddata.new$upr <- c(upr.dark,upr.lit)
+
+  preddata <- rbind(preddata, preddata.new)
+  
+}
+
+preddata <- preddata[preddata$LABEL == "Mean",]
+preddata$AGE <- as.numeric(preddata$AGE)
+
+# PLOT
+`01.13_GROWTH.points` <- ggplot() +
+
+  # ADD POINTS
+  geom_point(
+    data = SUBSET,
+    aes(
+      x = AGE,
+      y = WEIGHT,
+      colour = TREA,
+      alpha = 0.1)) +
+  
+  # FIT MODELS
+  geom_ribbon(
+    data = preddata,
+    aes(
+      x = AGE,
+      ymin = lwr,
+      ymax = upr,
+      fill = TREA),
+    alpha = 0.32) +
+  geom_line(
+    data = preddata,
+    aes(
+      x = AGE,
+      y = fit,
+      colour = TREA,
+      linetype = "bold"),
+      linewidth = 2) +
+  
+  # ADD AESTHETICS...
+  theme_minimal() +
+  labs(
+    x = "Sluglings age [day]",
+    y = "Weight [mg]",
+    colour = "Light treatment",
+    title = "Arion lusitanicus") +
+  scale_colour_manual(
+    values = COLOR.PALETTE,
+    labels = c("DARK", "LIT")) +
+  scale_fill_manual(
+    values = COLOR.PALETTE) +
+  guides(
+    linetype = "none",
+    alpha = "none",
+    fill = "none",
+    linewidth = "none",
+    colour = "none") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 10, face = "bold"),
+    axis.text.x = element_text(size = 8, angle = 0, hjust = 0.5),
+    axis.title.y = element_text(size = 10, face = "bold"),
+    axis.text.y = element_text(size = 8, angle = 0, hjust = 0.5))
+
+plot(`01.13_GROWTH.points`)
+
+# REMOVE
+rm(fit, lm.ARION.exp, AGE.ls)
+rm(i.preddata, preddata, preddata.new, preds, critval, fit.dark, fit.lit, i, lwr, lwr.dark)
+rm(lwr.lit, upr, upr.dark, upr.lit)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# 01.14 ARION - SURVIVAL ANALYSIS
+#################################
+
+# PLOT
+`01.14_MORTALITY` <- survfit2(
+  Surv(time, status) ~ treatment,
+  data = ARYON.KM) |>
+  ggsurvfit(
+    linewidth = 1) +
+  add_confidence_interval() +
+
+  # ADD AESTHETICS...
+  theme_minimal() +
+  labs(
+    x = "Sluglings age [week]",
+    y = "Survival probability",
+    colour = "Light treatment",
+    title = "Arion lusitanicus") +
+  scale_colour_manual(
+    values = COLOR.PALETTE,
+    labels = c("DARK", "LIT")) +
+  scale_fill_manual(
+    values = COLOR.PALETTE) +
+  coord_cartesian(xlim = c(3, 17)) +
+  guides(
+    fill = "none",
+    colour = "none") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 10, face = "bold"),
+    axis.text.x = element_text(size = 8, angle = 0, hjust = 0.5),
+    axis.title.y = element_text(size = 10, face = "bold"),
+    axis.text.y = element_text(size = 8, angle = 0, hjust = 0.5))
+
+plot(`01.14_MORTALITY`)
+
+# TEST
+#-----
+
+COX.ARYON <- coxph(Surv(time, status) ~ treatment, data = ARYON.KM)
+COX.ARYON.tbl <- tbl_regression(COX.ARYON, exp = TRUE) %>%
+
+  modify_spanning_header(
+    c(estimate, ci, p.value) ~ "**Arion reticulatum**") %>%
+
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+  
+knit_print(COX.ARYON.tbl)
+# print(COX.ARYON.tbl)
+
+rm(SUBSET, COX.ARYON, COX.ARYON.tbl)
+rm(ARYON, ARYON.KM)
+
+# FINAL PLOT
+#-----------
+
+`01.1_SLUGLINGS` <- grid.arrange(
+`01.11_GROWTH.points`,
+`01.12_MORTALITY`,
+`01.13_GROWTH.points`,
+`01.14_MORTALITY`)
+
+
+rm(`01.1_SLUGLINGS`, `01.11_GROWTH.points`, `01.12_MORTALITY`,`01.13_GROWTH.points`, `01.14_MORTALITY`)
+
+```
+
+# 01.2 - SLUGLINGS / BEHAVIOUR
+
+```{r 01.2 SLUGLINGS BEHAVIOUR NEW, fig.width = 10, message = FALSE, warning = FALSE}
+
+COLOR.PALETTE <- c(wes_palettes$Rushmore1[4], wes_palettes$Rushmore1[1])
+
+# 01.2 FORMAT
+#############
+
+# TIME
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^0:", "00:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^1:", "01:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^2:", "02:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^3:", "03:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^4:", "04:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^5:", "05:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^6:", "06:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^7:", "07:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^8:", "08:")
+SHIFT.TABLE$TIME <- str_replace_all(SHIFT.TABLE$TIME, "^9:", "09:")
+
+SHIFT.TABLE$ID <- paste0(SHIFT.TABLE$DATE, "-", SHIFT.TABLE$TIME, "-", SHIFT.TABLE$LIGHT.TREA)
+
+# CLEAN DATA (WHEN THEY ARE MORE THAN 20 ARROWS, IT'S A MISTAKE)
+#---------------------------------------------------------------
+
+# List of ID's
+ID.ls <- unique(SHIFT.TABLE$ID)
+
+# Create an empty data table
+SHIFT.TABLE.new <- SHIFT.TABLE
+SHIFT.TABLE.new <- SHIFT.TABLE.new[1,]
+SHIFT.TABLE.new <- SHIFT.TABLE.new[NA,]
+
+# Fill with new rows (should not exceed the number of slugs)
+for(i in ID.ls){
+  
+  # i <- "2024:01:25-22:45-DARK"
+  
+  i.SHIFT.TABLE <- SHIFT.TABLE[SHIFT.TABLE$ID == i,]
+  i.n.slugs <- unique(i.SHIFT.TABLE$N_SLUGS)
+
+  ifelse(
+    
+    # ARGUMENT
+    nrow(i.SHIFT.TABLE) < i.n.slugs,
+    
+    # IF YES
+    SHIFT.TABLE.new <- rbind(SHIFT.TABLE.new, i.SHIFT.TABLE),
+    
+    # IF NO
+    SHIFT.TABLE.new <- SHIFT.TABLE.new)
+  
+}
+
+SHIFT.TABLE <- SHIFT.TABLE.new
+
+# REMOVE FIRST LINE FULL OF NA's
+SHIFT.TABLE <- SHIFT.TABLE[-1,]
+
+# TIME AS NUMERIC
+#----------------
+SHIFT.TABLE$TIME.num <- SHIFT.TABLE$TIME
+SHIFT.TABLE$TIME.num <- str_replace_all(SHIFT.TABLE$TIME.num, ":00", ".0")
+SHIFT.TABLE$TIME.num <- str_replace_all(SHIFT.TABLE$TIME.num, ":15", ".25")
+SHIFT.TABLE$TIME.num <- str_replace_all(SHIFT.TABLE$TIME.num, ":30", ".5")
+SHIFT.TABLE$TIME.num <- str_replace_all(SHIFT.TABLE$TIME.num, ":45", ".75")
+SHIFT.TABLE$TIME.num <- as.numeric(SHIFT.TABLE$TIME.num)
+
+# DATE TIME
+SHIFT.TABLE$TIME.DATE <- paste(SHIFT.TABLE$DATE, SHIFT.TABLE$TIME)
+
+# REMOVE
+rm(i.SHIFT.TABLE, SHIFT.TABLE.new, i, ID.ls)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# REFORMAT (N MOVES PER TIME UNIT)
+#---------------------------------
+
+# CREATE AN EMPTY TABLE
+WEEK.ls <- unique(SHIFT.TABLE$WEEK)
+TIME.ls <- unique(SHIFT.TABLE$TIME)
+
+TIME.DATE <- expand.grid("DATE" = unique(SHIFT.TABLE$DATE),"TIME" = TIME.ls)
+TIME.DATE.ls <- paste(TIME.DATE$DATE, TIME.DATE$TIME)
+
+MOVE.TABLE <- expand.grid("LIGHT.TREA" = unique(SHIFT.TABLE$LIGHT.TREA), "TIME.DATE" = TIME.DATE.ls, "WEEK" = WEEK.ls)
+
+MOVE.TABLE$N.MOVES.row <- NA
+MOVE.TABLE$N.MOVES.avg <- NA
+MOVE.TABLE$TIME <- NA
+
+# FILL FOR LOOP
+for(i in (1:nrow(MOVE.TABLE))){
+  
+  # i <- 895 
+  
+  i.LIGHT.TREA <- MOVE.TABLE$LIGHT.TREA[i]
+  i.TIME.DATE <- MOVE.TABLE$TIME.DATE[i]
+  i.WEEK <- MOVE.TABLE$WEEK[i]
+  
+  # MOVE TABLE
+  i.MOVE.TABLE <- SHIFT.TABLE[SHIFT.TABLE$LIGHT.TREA == i.LIGHT.TREA & 
+                              SHIFT.TABLE$TIME.DATE == i.TIME.DATE & 
+                              SHIFT.TABLE$WEEK == i.WEEK,]
+
+  # N MOVES
+  i.n.slug <- unique(SHIFT.TABLE$N_SLUGS[SHIFT.TABLE$WEEK == i.WEEK & SHIFT.TABLE$LIGHT.TREA == i.LIGHT.TREA])
+  MOVE.TABLE$N.MOVES.row[i] <- nrow(i.MOVE.TABLE)
+  
+  ifelse(
+
+    # ARGUMENT
+    MOVE.TABLE$N.MOVES.row[i] == 0,
+    
+    # IF YES
+    MOVE.TABLE$N.MOVES.avg[i] <- 0,
+    
+    # IF NO
+    MOVE.TABLE$N.MOVES.avg[i] <-  MOVE.TABLE$N.MOVES.row[i] / i.n.slug)
+  
+  MOVE.TABLE$TIME[i] <- i.TIME.DATE <- substr(i.TIME.DATE, 12, 16)
+
+}
+
+# REMOVE FIRST LINE FULL OF NA's
+MOVE.TABLE <- MOVE.TABLE[-1,]
+
+# TIME AS NUMERIC
+#----------------
+MOVE.TABLE$TIME.num <- MOVE.TABLE$TIME
+
+MOVE.TABLE$TIME.num <- str_replace_all(MOVE.TABLE$TIME.num, ":00", ".0")
+MOVE.TABLE$TIME.num <- str_replace_all(MOVE.TABLE$TIME.num, ":15", ".25")
+MOVE.TABLE$TIME.num <- str_replace_all(MOVE.TABLE$TIME.num, ":30", ".5")
+MOVE.TABLE$TIME.num <- str_replace_all(MOVE.TABLE$TIME.num, ":45", ".75")
+
+MOVE.TABLE$TIME.num <- as.numeric(MOVE.TABLE$TIME.num)
+
+# REMOVE
+rm(i.MOVE.TABLE, i, i.LIGHT.TREA, i.n.slug, i.TIME.DATE, i.WEEK, TIME.DATE.ls, TIME.ls, WEEK.ls)
+
+##############################################################################################################
+
+# MODELS
+#-------
+MOVE.TABLE$TIME.radian <- MOVE.TABLE$TIME.num / 24 * 2 * pi
+
+# FULL MODEL
+lm.model.radian <- lmer(N.MOVES.row ~ sin(TIME.radian) * LIGHT.TREA + 
+                                          cos(TIME.radian) * LIGHT.TREA + 
+                                          sin(2 * TIME.radian) * LIGHT.TREA +
+                                          cos(2 * TIME.radian) * LIGHT.TREA +
+                                          (1|WEEK), data = MOVE.TABLE) 
+  
+qqnorm(resid(lm.model.radian))
+qqline(resid(lm.model.radian))
+
+# WRITE
+lm.model.radian.tbl <- tbl_regression(lm.model.radian, 
+                                      intercept = T,
+                                      pvalue_fun = ~ style_pvalue(.x, digits = 3),
+                                      estimate_fun = ~ style_number(.x, digits = 3)) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**N moves ~ Lux * Time + (1|Week)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(lm.model.radian.tbl)
+# print(lm.model.radian.tbl)
+
+rm(lm.model.radian.tbl)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# SIMULATE DATA
+#--------------
+
+# Create empty df
+preddata <- expand.grid(
+            "TIME.radian" = seq(min(MOVE.TABLE$TIME.radian), max(MOVE.TABLE$TIME.radian), length = 100), 
+            "LIGHT.TREA" = as.factor(c("DARK", "LIT")),
+            "WEEK" = as.factor(seq(2, 6)))
+
+# round
+preddata$TIME.radian <- round(preddata$TIME.radian, 4)
+
+# PREDICT
+preds <- predict(lm.model.radian, newdata = preddata , type = "link", se.fit = TRUE)
+
+critval <- 1.96 ## approx 95% CI
+upr <- preds$fit + (critval * preds$se.fit)
+lwr <- preds$fit - (critval * preds$se.fit)
+fit <- preds$fit
+
+preddata$fit <- fit
+preddata$lwr <- lwr
+preddata$upr <- upr
+
+# MODEL AVERAGING
+#----------------
+radian.ls <- unique(preddata$TIME.radian)
+
+for(i in radian.ls){
+  
+  # i <- 0.9421
+  
+  preddata.new <- preddata[1:2,]
+  preddata.new[1:2,] <- NA
+  
+  i.preddata <- preddata[preddata$TIME.radian == i,]
+  
+  fit.dark <- mean(i.preddata$fit[i.preddata$LIGHT.TREA == "DARK"])
+  lwr.dark <- mean(i.preddata$lwr[i.preddata$LIGHT.TREA == "DARK"])
+  upr.dark <- mean(i.preddata$upr[i.preddata$LIGHT.TREA == "DARK"])
+  
+  fit.lit <- mean(i.preddata$fit[i.preddata$LIGHT.TREA == "LIT"])
+  lwr.lit <- mean(i.preddata$lwr[i.preddata$LIGHT.TREA == "LIT"])
+  upr.lit <- mean(i.preddata$upr[i.preddata$LIGHT.TREA == "LIT"])
+  
+  preddata.new$TIME.radian <- c(i,i)
+  preddata.new$LIGHT.TREA <- c("DARK", "LIT")
+  preddata.new$WEEK <- c("Mean", "Mean")
+  preddata.new$fit <- c(fit.dark,fit.lit)
+  preddata.new$lwr <- c(lwr.dark,lwr.lit)
+  preddata.new$upr <- c(upr.dark,upr.lit)
+
+  preddata <- rbind(preddata, preddata.new)
+  
+}
+
+preddata <- preddata[preddata$WEEK == "Mean",]
+
+# PLOT
+#-----
+PLOT.01.06.N <- ggplot() +
+  
+# ADD POLYGONS FOR NIGHT
+geom_rect(
+  aes(
+    xmin = -Inf,
+    xmax = 7 / 24 * 2 * pi,
+    ymin = -Inf,
+    ymax = Inf),
+  alpha = 0.6,
+  fill = "grey10") +
+
+geom_rect(
+aes(
+  xmin = 17 / 24 * 2 * pi,
+  xmax = Inf,
+  ymin = -Inf,
+  ymax = Inf),
+alpha = 0.6,
+fill = "grey10") +
+
+# ADD POINTS
+geom_point(
+  data = MOVE.TABLE,
+  aes(
+    x = TIME.radian,
+    y = N.MOVES.avg,
+    colour = LIGHT.TREA), 
+  alpha = 0.2) +
+
+# FIT CI
+geom_ribbon(
+  data = preddata,
+  aes(
+    x = TIME.radian,
+    ymin = lwr,
+    ymax = upr,
+    fill = LIGHT.TREA),
+  alpha = 0.5) +
+
+# FIT MODEL
+geom_line(
+  data = preddata,
+  aes(
+    x = TIME.radian,
+    y = fit,
+    colour = LIGHT.TREA,
+    linetype = "bold"),
+  linewidth = 2) +
+
+# ADD AESTHETICS...
+theme_minimal() +
+labs(x = "Time",
+     y = "Proportion of slugs moving",
+     colour = "Light treatment") +
+
+scale_colour_manual(values = COLOR.PALETTE) +
+scale_fill_manual(values = COLOR.PALETTE) +
+scale_x_continuous(
+  breaks = c(0 / 24 * 2 * pi, 6 / 24 * 2 * pi, 12 / 24 * 2 * pi, 18 / 24 * 2 * pi, 24 / 24 * 2 * pi),
+  label = c("00h00","06h00", "12h00", "18h00", "24h00")) +
+guides(linetype = "none",
+       alpha = "none",
+       fill = "none",
+       size = "none") +
+theme(
+  legend.position = c(0.8, 0.85),
+  legend.title = element_text(size = 16, face = "bold"),
+  legend.text = element_text(size = 16, face = "bold"),
+  axis.title.x = element_text(size = 20, face = "bold"),
+  axis.text.x = element_text(size = 12, angle = 0, hjust = 0.5),
+  axis.title.y = element_text(size = 20, face = "bold"),
+  axis.text.y = element_text(size = 12, angle = 0, hjust = 0.5))
+
+plot(PLOT.01.06.N)
+
+rm(PLOT.01.06.N, preddata, preds, fit, lwr, upr, critval, lm.model.radian, preddata.new)
+rm(i, fit.dark, fit.lit, lwr.dark, lwr.lit, upr.dark, upr.lit, radian.ls)
+rm(i.preddata, i.preddata.new)
+
+##############################################################################################################
+
+# FINAL REMOVE
+#-------------
+rm(MOVE.TABLE, SHIFT.TABLE)
+
+```
+
+# 02.0 - TRACKPLATES / DATA FORMATING & EXPLORATORY PLOTS
+
+```{r 02.0 TRACKPLATES DATA FORMATING & EXPLORATORY PLOTS, fig.width = 10, warning = FALSE, message = FALSE}
+
+# FORMAT TRACKPLATES
+#-------------------
+
+TRACKPLATES <- data.frame(
+  "YEAR" = 9999,
+  "DATE" = 9999,
+  "HABITAT" = 9999,
+  "STUDY.SITE" = 9999,
+  "LIGHT_TRMT" = 9999,
+  "PLATE_ID" = 9999,
+  "PLATE_LOC" = 9999,
+  "MICE_TRACKS_N" = 9999,
+  "SLUG_TRACKS_PROP" = 9999)
+
+# 2022
+#-----
+for(i in (1:nrow(TRACKS.22))){
+  
+  # i <- 124
+  
+  i.TRACKPLATES <- TRACKPLATES[1,]
+  
+  i.TRACKPLATES$YEAR <- "2022"
+  i.TRACKPLATES$DATE <- TRACKS.22$Datetime.laid[i]
+  i.TRACKPLATES$HABITAT <- "WFS"
+  i.TRACKPLATES$STUDY.SITE <- TRACKS.22$STUDY_SITE[i] 
+  i.TRACKPLATES$LIGHT_TRMT <- TRACKS.22$LIGHT_TRMT[i]
+  i.TRACKPLATES$PLATE_ID <- TRACKS.22$PLATE_ID[i]
+  i.TRACKPLATES$PLATE_LOC <- TRACKS.22$PLATE_LOC[i]
+  i.TRACKPLATES$MICE_TRACKS_N <- TRACKS.22$MICE_TRACKS_N[i]
+  i.TRACKPLATES$SLUG_TRACKS_PROP <- TRACKS.22$SLUG_TRACKS_PROP[i]
+  
+  TRACKPLATES <- rbind(TRACKPLATES, i.TRACKPLATES)
+  
+}
+
+# 2023
+#-----
+for(i in (1:nrow(TRACKS.23))){
+  
+  # i <- 124
+  
+  i.TRACKPLATES <- TRACKPLATES[1,]
+  
+  i.TRACKPLATES$YEAR <- "2023"
+  i.TRACKPLATES$DATE <- TRACKS.23$data1[i]
+  ifelse(TRACKS.23$site_type[i] == "Fallow", i.TRACKPLATES$HABITAT <- "WFS",  i.TRACKPLATES$HABITAT <- "GRASSLAND")
+  i.TRACKPLATES$STUDY.SITE <- TRACKS.23$site_id[i] 
+  ifelse(TRACKS.23$treatment[i] == "Dark", i.TRACKPLATES$LIGHT_TRMT <- "DARK",  i.TRACKPLATES$LIGHT_TRMT <- "LIGHT")
+  i.TRACKPLATES$PLATE_ID <- TRACKS.23$plate_nb[i]
+  ifelse(TRACKS.23$plate_position[i] == "D", i.TRACKPLATES$PLATE_LOC <- "CLOSE",  i.TRACKPLATES$PLATE_LOC <- "FAR")
+  i.TRACKPLATES$MICE_TRACKS_N <- TRACKS.23$tracks_number[i]
+  i.TRACKPLATES$SLUG_TRACKS_PROP <- TRACKS.23$Slug[i]
+  
+  TRACKPLATES <- rbind(TRACKPLATES, i.TRACKPLATES)
+  
+}
+
+rm(TRACKS.22, TRACKS.23, i.TRACKPLATES)
+
+# RENAME STUDY SITES
+#-------------------
+TRACKPLATES$STUDY.SITE <- str_replace(TRACKPLATES$STUDY.SITE, "\\b1\\b", "YELLOWHAMMER")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b2\\b", "WOODPECKER")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b3\\b", "CHAMOIS")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b4\\b", "DEER")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b5\\b", "QUAIL")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b6\\b", "UPUPA")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b7\\b", "BADGER")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b8\\b", "HORNET")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "\\b9\\b", "ANTS")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "10", "MARTEN")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "11", "GRASS SNAKE")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "12", "LIZARD")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "25", "TOAD")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "26", "PEREGRINE")
+TRACKPLATES$STUDY.SITE <- str_replace_all(TRACKPLATES$STUDY.SITE, "27", "EAGLE")
+
+# CLEAN
+#------
+TRACKPLATES <- TRACKPLATES[-1,]
+TRACKPLATES$DATE <- as.Date(TRACKPLATES$DATE, format = "%d-%m-%y")
+TRACKPLATES$MICE_TRACKS_N <- as.numeric(TRACKPLATES$MICE_TRACKS_N)
+TRACKPLATES <- TRACKPLATES[!is.na(TRACKPLATES$DATE),]
+
+# CREATE NEW VARIABLE
+#####################
+
+# DOY
+TRACKPLATES$DATE_DOY <- yday(TRACKPLATES$DATE)
+
+# TREATMENT
+TRACKPLATES$TREATMENT <- paste0(TRACKPLATES$LIGHT_TRMT, "-", TRACKPLATES$PLATE_LOC)
+
+# BINOMIAL
+TRACKPLATES$SLUG_TRACKS_BIN <- NA
+for(i in (1:nrow(TRACKPLATES))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    TRACKPLATES$SLUG_TRACKS_PROP[i] > 0,
+    
+    # IF YES
+    TRACKPLATES$SLUG_TRACKS_BIN[i] <- 1,
+    
+    # IF NO
+    TRACKPLATES$SLUG_TRACKS_BIN[i] <- 0)
+
+}
+
+# MERGE PROP 2022 (0 - 1) & 2023 (0 - 100)
+#-----------------------------------------
+
+for(i in (1:nrow(TRACKPLATES))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    TRACKPLATES$SLUG_TRACKS_PROP[i] < 1,
+    
+    # IF YES
+    TRACKPLATES$SLUG_TRACKS_PROP[i] <- TRACKPLATES$SLUG_TRACKS_PROP[i] * 100,
+    
+    # IF NO
+    TRACKPLATES$SLUG_TRACKS_PROP[i] <- TRACKPLATES$SLUG_TRACKS_PROP[i])
+
+}
+
+rm(i)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# ADD ABIOTIC
+#############
+
+# SAMP ID (+1 because recovered the day after!)
+#----------------------------------------------
+TRACKPLATES$SAMP_ID <- format(TRACKPLATES$DATE  + 1, format = "%y%m%d")
+TRACKPLATES$SAMP_ID <- as.character(TRACKPLATES$SAMP_ID)
+
+# TEMP & RAIN
+#------------
+
+TRACKPLATES$RAIN <- NA
+TRACKPLATES$TEMP <- NA
+
+for(i in (1:nrow(TRACKPLATES))){
+  
+  # i <- 43
+  
+  i.SAMP_ID <- TRACKPLATES$SAMP_ID[i]
+  i.ABIOTIC <- ABIOTIC[ABIOTIC$DATE == i.SAMP_ID,]
+  
+  TRACKPLATES$RAIN[i] <- i.ABIOTIC$RAIN_SUM12H[i.ABIOTIC$TIME == "08h00"] 
+  TRACKPLATES$TEMP[i] <- i.ABIOTIC$TEMP_12H[i.ABIOTIC$TIME == "08h00"]
+  
+}
+
+rm(i, i.SAMP_ID, i.ABIOTIC)
+
+##############################################################################################################
+
+# 02.01 EXPLORATORY PLOTS / N PLATES LAID
+#########################################
+
+# HABITAT
+COLOR.PALETTE <- c(wes_palettes$Cavalcanti1[2], "white")
+
+# SAMPLE SIZE
+#------------
+
+# HABITAT
+`02.01_TRACKPLATES.HABITAT` <- ggplot(
+  data = TRACKPLATES, 
+  aes(x = YEAR,
+      fill = HABITAT,
+      pattern = LIGHT_TRMT)) +
+  geom_bar_pattern(
+    color = "black",
+    position = position_dodge(preserve = "single"),
+    pattern_fill = "burlywood",
+    pattern_color = "burlywood",
+    pattern_angle = 45, 
+    pattern_density = 0.25,
+    pattern_spacing = 0.025, 
+    pattern_key_scale_factor = 0.6) +  
+  labs(
+    x = "Year",
+    y = "n trackplates") +
+  scale_fill_manual(
+    values = COLOR.PALETTE,
+    guide = guide_legend(
+    override.aes = list(pattern = "none"))) +
+  theme_minimal() +
+  scale_pattern_manual(values = c(DARK   = "none", LIGHT  = "stripe")) +
+  theme(
+    # legend.position = c(0.1, 0.8),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12, angle = 0, hjust = 1),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`02.01_TRACKPLATES.HABITAT`)
+
+# SAVE
+# ggsave(filename = paste0("02.01_TRACKPLATES.HABITAT.jpeg"),
+#          plot = `02.01_TRACKPLATES.HABITAT`, path = HOME,
+#          height = 12, width = 16, units = "cm")
+
+# STUDY SITE
+`02.02_TRACKPLATES.SITE` <- ggplot(
+  data = TRACKPLATES, 
+  aes(x = STUDY.SITE,
+      fill = HABITAT,
+      pattern = LIGHT_TRMT)) +
+  geom_bar_pattern(
+    color = "black",
+    position = position_dodge(preserve = "single"),
+    pattern_fill = "burlywood",
+    pattern_color = "burlywood",
+    pattern_angle = 45, 
+    pattern_density = 0.25,
+    pattern_spacing = 0.025, 
+    pattern_key_scale_factor = 0.6) +  
+  labs(
+    x = "Study site",
+    y = "n trackplates") +
+  scale_fill_manual(
+    values = COLOR.PALETTE,
+    guide = guide_legend(
+    override.aes = list(pattern = "none"))) +
+  theme_minimal() +
+  scale_pattern_manual(values = c(DARK   = "none", LIGHT  = "stripe")) +
+  theme(
+    # legend.position = c(0.1, 0.8),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`02.02_TRACKPLATES.SITE`)
+
+# SAVE
+# ggsave(filename = paste0("02.02_TRACKPLATES.SITE.jpeg"),
+#          plot = `02.02_TRACKPLATES.SITE`, path = HOME,
+#          height = 12, width = 16, units = "cm")
+
+rm(`02.01_TRACKPLATES.HABITAT`, `02.02_TRACKPLATES.SITE`, COLOR.PALETTE)
+
+##############################################################################################################
+
+# 02.02 PROPORTION OF TRACKS - ONLY ILLUMINATED BUT FAR <vs> CLOSE
+##################################################################
+
+COLOR.PALETTE <- c(wes_palettes$Cavalcanti1[2], "white")
+SUBSET <- TRACKPLATES[TRACKPLATES$LIGHT_TRMT == "LIGHT",] # 737
+
+# 02.02 - PIE CHART HABITAT & LIGHT TREATMENT - PROPORTION
+#---------------------------------------------------------
+
+columns = c("HABITAT","TREATMENT","PRESENCE", "N", "PERCENTAGE") 
+PIE = data.frame(matrix(nrow = 8, ncol = length(columns))) 
+colnames(PIE) = columns
+
+PIE$HABITAT <- c("WFS", "WFS", "WFS", "WFS", "GRASSLAND", "GRASSLAND",  "GRASSLAND",  "GRASSLAND")
+PIE$TREATMENT <- c("DARK", "DARK", "LIGHT", "LIGHT", "DARK", "DARK", "LIGHT", "LIGHT") 
+PIE$PRESENCE <- c("YES", "NO", "YES", "NO", "YES", "NO", "YES", "NO")
+PIE$N <- c(
+          nrow(SUBSET[SUBSET$HABITAT == "WFS" & SUBSET$PLATE_LOC == "FAR" & SUBSET$SLUG_TRACKS_BIN == 1,]),
+          nrow(SUBSET[SUBSET$HABITAT == "WFS" & SUBSET$PLATE_LOC == "FAR" & SUBSET$SLUG_TRACKS_BIN == 0,]),
+          nrow(SUBSET[SUBSET$HABITAT == "WFS" & SUBSET$PLATE_LOC == "CLOSE" & SUBSET$SLUG_TRACKS_BIN == 1,]),
+          nrow(SUBSET[SUBSET$HABITAT == "WFS" & SUBSET$PLATE_LOC == "CLOSE" & SUBSET$SLUG_TRACKS_BIN == 0,]),
+          nrow(SUBSET[SUBSET$HABITAT == "GRASSLAND" & SUBSET$PLATE_LOC == "FAR" & SUBSET$SLUG_TRACKS_BIN == 1,]),
+          nrow(SUBSET[SUBSET$HABITAT == "GRASSLAND" & SUBSET$PLATE_LOC == "FAR" & SUBSET$SLUG_TRACKS_BIN == 0,]),
+          nrow(SUBSET[SUBSET$HABITAT == "GRASSLAND" & SUBSET$PLATE_LOC == "CLOSE" & SUBSET$SLUG_TRACKS_BIN == 1,]),
+          nrow(SUBSET[SUBSET$HABITAT == "GRASSLAND" & SUBSET$PLATE_LOC == "CLOSE" & SUBSET$SLUG_TRACKS_BIN == 0,]))
+PIE$PERCENTAGE <- c(
+          round(PIE$N[1] / (PIE$N[1] + PIE$N[2]), 2),
+          round(PIE$N[2] / (PIE$N[1] + PIE$N[2]), 2),
+          round(PIE$N[3] / (PIE$N[3] + PIE$N[4]), 2),
+          round(PIE$N[4] / (PIE$N[3] + PIE$N[4]), 2),
+          round(PIE$N[5] / (PIE$N[5] + PIE$N[6]), 2),
+          round(PIE$N[6] / (PIE$N[5] + PIE$N[6]), 2),
+          round(PIE$N[7] / (PIE$N[7] + PIE$N[8]), 2),
+          round(PIE$N[8] / (PIE$N[7] + PIE$N[8]), 2))
+
+PIE$PERCENTAGE <- paste0((PIE$PERCENTAGE * 100), "%")
+rm(columns)
+
+# GRASSLAND
+`02.02_TRACKPLATES.HABITAT.GRASSLAND.pie` <- ggplot(
+  data = PIE[PIE$HABITAT == "GRASSLAND",],
+  aes(
+    x = "",
+    y = N,
+    fill = PRESENCE,
+    pattern = TREATMENT)) +
+  geom_col_pattern(
+    color = "black",
+    pattern_color = "burlywood",
+    pattern_fill = "burlywood",
+    pattern_angle = 45,
+    pattern_density = 0.25,
+    pattern_spacing = 0.05,
+    pattern_key_scale_factor = 0.6) +
+  coord_polar(theta = "y", start = 0) +
+  geom_label(aes(label = PERCENTAGE),
+             color = "white",
+             size = 4,
+             position = position_stack(vjust = 0.5),
+             show.legend = FALSE) +
+  scale_fill_manual(values = c("grey75", wes_palettes$Cavalcanti1[2])) +
+  scale_pattern_manual(
+    values = c("LIGHT" = "stripe", "DARK"  = "none"),
+    name = "Treatment",
+    labels = c("DARK", "LIGHT")) + 
+  theme_minimal() +
+  guides(pattern = "none") +
+  facet_wrap(factor(TREATMENT, levels = c('LIGHT', 'DARK')) ~ ., dir = "h") +
+  theme(
+    legend.position = "top",
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    strip.text.x = element_blank())
+
+# WFS
+`02.02_TRACKPLATES.HABITAT.WFS.pie` <- ggplot(
+  data = PIE[PIE$HABITAT == "WFS",],
+  aes(
+    x = "",
+    y = N,
+    fill = PRESENCE,
+    pattern = TREATMENT)) +
+  geom_col_pattern(
+    color = "black",
+    pattern_color = "burlywood",
+    pattern_fill = "burlywood",
+    pattern_angle = 45,
+    pattern_density = 0.25,
+    pattern_spacing = 0.05,
+    pattern_key_scale_factor = 0.6) +
+  coord_polar(theta = "y", start = 0) +
+  geom_label(aes(label = PERCENTAGE),
+             size = 4,
+             color = "black",
+             position = position_stack(vjust = 0.5),
+             show.legend = FALSE) +
+  scale_fill_manual(values = c("grey75", "white")) +
+  scale_pattern_manual(
+    values = c("LIGHT" = "stripe", "DARK"  = "none"),
+    name = "Treatment",
+    labels = c("DARK", "LIGHT")) + 
+  theme_minimal() +
+  guides(pattern = "none") +
+  facet_wrap(factor(TREATMENT, levels = c('LIGHT', 'DARK')) ~ ., dir = "h") +
+  theme(
+    legend.position = "top",
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    strip.text.x = element_blank())
+
+# MERGE
+`02.02_TRACKPLATES.HABITAT.pie` <- grid.arrange(`02.02_TRACKPLATES.HABITAT.GRASSLAND.pie`, `02.02_TRACKPLATES.HABITAT.WFS.pie`, nrow = 1)
+rm(`02.02_TRACKPLATES.HABITAT.WFS.pie`, `02.02_TRACKPLATES.HABITAT.GRASSLAND.pie`)
+
+# 02.02 - BOXPLOT HABITAT & LIGHT TREATMENT - PROPORTION
+#-------------------------------------------------------
+
+# REMOVE NA's
+SUBSET <- SUBSET[!is.na(SUBSET$SLUG_TRACKS_PROP),] # 605
+
+# ONLY KEEP POSITIVE PLATES
+SUBSET <- SUBSET[SUBSET$SLUG_TRACKS_PROP > 0,] # 316
+
+`02.02_TRACKPLATES.HABITAT.box` <- ggplot(
+  data = SUBSET,
+  aes(
+    x = HABITAT,
+    y = SLUG_TRACKS_PROP,
+    fill = HABITAT,
+    pattern = PLATE_LOC)) +
+  geom_boxplot_pattern(
+    pattern_color = "burlywood",
+    pattern_fill = "burlywood",
+    pattern_angle = 45,
+    pattern_density = 0.25,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  geom_jitter(alpha = 0.3) +
+  scale_pattern_manual(
+    values = c("CLOSE" = "stripe", "FAR"  = "none"),
+    name = "Treatment",
+    labels = c("dark", "light")) +
+  scale_fill_manual(values = COLOR.PALETTE) +
+  stat_compare_means(
+    aes(
+    group = PLATE_LOC),
+    label = "p.format",
+    size = 4,
+    method = "t.test") +
+  theme_minimal() +
+  guides(fill = "none") +
+  labs(
+    x = "Habitat",
+    y = "Proportion covered by tracks [%]") +
+  theme(
+    legend.position = c(0.1, 0.75),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`02.02_TRACKPLATES.HABITAT.box`)
+
+# SAVE
+# ggsave(filename = paste0("02.02_TRACKPLATES.HABITAT.pie.jpeg"),
+         # plot = `02.02_TRACKPLATES.HABITAT.pie`, path = HOME,
+         # height = 12, width = 20, units = "cm")
+
+# REMOVE
+rm(`02.02_TRACKPLATES.HABITAT.box`, `02.02_TRACKPLATES.HABITAT.pie`)
+rm(PIE)
+
+##############################################################################################################
+
+# COLOR PALETTE (DARK vs LIGHT)
+COLOR.PALETTE <- c(wes_palettes$Rushmore1[4], wes_palettes$Rushmore1[1])
+
+# 02.04 TEMP AS COVARIABLE
+##########################
+
+# SUBSET
+SUBSET <- TRACKPLATES[!is.na(TRACKPLATES$SLUG_TRACKS_BIN),] # 1173
+SUBSET <- SUBSET[SUBSET$PLATE_LOC == "CLOSE",] # 605
+SUBSET <- SUBSET[SUBSET$HABITA == "WFS",] # 376
+
+# TEMP x PROBABILTY OF FINDING TRACKS
+#-----------------------------------
+
+# BINOMIAL
+mod.bin.TEMP <- glm(SLUG_TRACKS_BIN ~ LIGHT_TRMT * TEMP, data = SUBSET, family = binomial)
+
+# PREDICT
+lim.min <- min(SUBSET$TEMP)
+lim.max <- max(SUBSET$TEMP)
+
+# Create empty df
+preddata  <- expand.grid("TEMP" = seq(lim.min, lim.max, 1), "LIGHT_TRMT" = as.factor(c("DARK", "LIGHT")))
+
+# PREDICT
+preds <- predict(mod.bin.TEMP, newdata = preddata , type = "link", se.fit = TRUE)
+
+critval <- 1.96 ## approx 95% CI
+upr <- preds$fit + (critval * preds$se.fit)
+lwr <- preds$fit - (critval * preds$se.fit)
+fit <- preds$fit
+
+fit2 <- mod.bin.TEMP$family$linkinv(fit)
+upr2 <- mod.bin.TEMP$family$linkinv(upr)
+lwr2 <- mod.bin.TEMP$family$linkinv(lwr)
+
+preddata$fit <- fit2
+preddata$lwr <- lwr2 
+preddata$upr <- upr2 
+
+# PLOT
+`02.04_TEMP.PROB.points` <- ggplot() +
+  
+  # FIT MODELS
+  geom_ribbon(
+    data = preddata,
+    aes(
+      x = TEMP,
+      ymin = lwr,
+      ymax = upr,
+      colour = LIGHT_TRMT),
+    alpha = 0.1) +
+  geom_line(
+    data = preddata,
+    aes(
+      x = TEMP,
+      y = fit,
+      colour = LIGHT_TRMT,
+      linetype = "bold"),
+    linewidth = 2) +
+
+  # ADD POINTS
+  geom_point(
+    data = SUBSET,
+    aes(
+      x = TEMP,
+      y = as.numeric(SLUG_TRACKS_BIN),
+      colour = LIGHT_TRMT)) +
+
+  # ADD AESTHETICS...
+  theme_minimal() +
+  labs(
+    x = "Temp [°C]",
+    y = "Slug presence on plates",
+    colour = "Light treatment",
+    title = "Temp & probability of finding slug tracks") +
+  scale_colour_manual(values = COLOR.PALETTE) +
+  scale_fill_manual(values = COLOR.PALETTE) +
+  guides(
+    linetype = "none",
+    alpha = "none",
+    fill = "none",
+    size = "none") +
+  theme(
+    legend.position = c(0.2, 0.85),
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 10, face = "bold"),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 10, face = "bold"),
+    axis.text.x = element_text(size = 8),
+    axis.title.y = element_text(size = 10, face = "bold"),
+    axis.text.y = element_text(size = 8))
+
+rm(preddata, preds, critval, fit, fit2, lwr, lwr2, upr, upr2, lim.max, lim.min, mod.bin.TEMP)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# TEMP x ABUNDANCE OF TRACKS
+#---------------------------
+
+# SUBSET
+SUBSET <- TRACKPLATES[!is.na(TRACKPLATES$SLUG_TRACKS_PROP),] # 1173
+SUBSET <- SUBSET[SUBSET$PLATE_LOC == "CLOSE",] # 596
+SUBSET <- SUBSET[SUBSET$HABITA == "WFS",] # 376
+# SUBSET <- SUBSET[SUBSET$SLUG_TRACKS_PROP > 0,] # 215
+
+# RUN MODELS
+lm.TEMP <- glm(SLUG_TRACKS_PROP ~ TEMP * LIGHT_TRMT, data = SUBSET)
+
+# PREDICT
+lim.min <- min(SUBSET$TEMP)
+lim.max <- max(SUBSET$TEMP)
+
+# Create empty df
+preddata  <- expand.grid("TEMP" = seq(lim.min, lim.max, 1), "LIGHT_TRMT" = as.factor(c("DARK", "LIGHT")))
+
+# PREDICT
+preds <- predict(lm.TEMP, newdata = preddata , type = "link", se.fit = TRUE)
+
+critval <- 1.96 ## approx 95% CI
+upr <- preds$fit + (critval * preds$se.fit)
+lwr <- preds$fit - (critval * preds$se.fit)
+fit <- preds$fit
+
+fit2 <- lm.TEMP$family$linkinv(fit)
+upr2 <- lm.TEMP$family$linkinv(upr)
+lwr2 <- lm.TEMP$family$linkinv(lwr)
+
+preddata$fit <- fit2
+preddata$lwr <- lwr2 
+preddata$upr <- upr2 
+
+`02.04_TEMP.ABUN.points` <- ggplot() +
+  
+  # FIT MODELS
+  geom_ribbon(
+    data = preddata,
+    aes(
+      x = TEMP,
+      ymin = lwr,
+      ymax = upr,
+      colour = LIGHT_TRMT),
+    alpha = 0.1) +
+  geom_line(
+    data = preddata,
+    aes(
+      x = TEMP,
+      y = fit,
+      colour = LIGHT_TRMT,
+      linetype = "bold"),
+    linewidth = 2) +
+
+  # ADD POINTS
+  geom_point(
+    data = SUBSET, # 6 NA's
+    aes(
+      x = TEMP,
+      y = SLUG_TRACKS_PROP,
+      colour = LIGHT_TRMT)) +
+
+  # ADD AESTHETICS...
+  theme_minimal() +
+  labs(
+    x = "Temp [°C]",
+    y = "Proportion of plates cover by slugs",
+    colour = "Light treatment",
+    title = "Proportion of slugs tracks on plates") +
+  scale_colour_manual(values = COLOR.PALETTE) +
+  scale_fill_manual(values = COLOR.PALETTE) +
+  guides(
+    linetype = "none",
+    alpha = "none",
+    fill = "none",
+    size = "none") +
+  theme(
+    legend.position = c(0.2, 0.85),
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 10, face = "bold"),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 10, face = "bold"),
+    axis.text.x = element_text(size = 8),
+    axis.title.y = element_text(size = 10, face = "bold"),
+    axis.text.y = element_text(size = 8))
+
+rm(fit, lim.max, lim.min, lm.TEMP)
+
+# MERGE & REMOVE
+`02.04_TEMP.points` <- grid.arrange(`02.04_TEMP.PROB.points`, `02.04_TEMP.ABUN.points`, nrow = 1)
+rm(`02.04_TEMP.ABUN.points`, `02.04_TEMP.points`, `02.04_TEMP.PROB.points`)
+
+```
+
+# 02.1 - TRACKPLATES / MODELS
+
+```{r 02.1 TRACKPLATES MODELS, fig.width = 10, message = FALSE, warning = FALSE}
+
+SUBSET <- TRACKPLATES[TRACKPLATES$HABITAT == "WFS" & TRACKPLATES$PLATE_LOC == "CLOSE",] # 462
+SUBSET <- SUBSET[SUBSET$SLUG_TRACKS_PROP > 0,] # 301
+
+# MODEL SELECTION
+#----------------
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "AIC" = 9999,
+  "d.AIC" = 9999)
+
+# TWO VARIABLES
+#--------------
+
+#mod2.1
+mod2.1 <- lmer(SLUG_TRACKS_PROP ~ LIGHT_TRMT * TEMP + (1|STUDY.SITE) + (1|SAMP_ID), data = SUBSET)
+
+Model <- "mod2.1"
+Variable <- "LIGHT * TEMP"
+AIC <- AIC(mod2.1)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1)
+
+#mod2.2
+mod2.2 <- lmer(SLUG_TRACKS_PROP ~ LIGHT_TRMT + TEMP + (1|STUDY.SITE) + (1|SAMP_ID), data = SUBSET)
+
+Model <- "mod2.2"
+Variable <- "LIGHT + TEMP"
+AIC <- AIC(mod2.2)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1)
+rm(mod2.2)
+
+# ONE VARIABLE
+#-------------
+
+# mod1.1 
+mod1.1 <- lmer(SLUG_TRACKS_PROP ~ LIGHT_TRMT + (1|STUDY.SITE) + (1|SAMP_ID), data = SUBSET)
+
+Model <- "mod1.1"
+Variable <- "LIGHT"
+AIC <- AIC(mod1.1)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1)
+
+# mod1.2
+mod1.2 <- lmer(SLUG_TRACKS_PROP ~ TEMP + (1|STUDY.SITE) + (1|SAMP_ID), data = SUBSET)
+
+Model <- "mod1.2"
+Variable <- "TEMP"
+AIC <- AIC(mod1.2)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.2)
+
+# ZERO VARIABLE
+#--------------
+
+# mod0
+mod0 <- lmer(SLUG_TRACKS_PROP ~ 1 + (1|STUDY.SITE) + (1|SAMP_ID), data = SUBSET)
+
+Model <- "mod0"
+Variable <- "1"
+AIC <- AIC(mod0)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod0)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(i in (1:nrow(AIC.TABLE))){
+  
+  AIC.TABLE$d.AIC[i] <- round(AIC.TABLE$AIC[i] - AIC.min, 2)
+  
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# BEST MODELS - PROP
+#-------------------
+
+# mod 2.1 [BEST AIC]
+mod2.1 <- lmer(sqrt(SLUG_TRACKS_PROP) ~ LIGHT_TRMT * TEMP + (1|STUDY.SITE) + (1|SAMP_ID), data = SUBSET)
+
+`02.1_mod2.1.tbl` <- tbl_regression(mod2.1, 
+                                    intercept = T,
+                                    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+                                    estimate_fun = ~ style_number(.x, digits = 3)) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**SLUG_TRACKS_PROP.sqrt ~ LIGHT * DATE_DOY + (1|STUDY SITE) + (1|YEAR)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(`02.1_mod2.1.tbl`)
+# print(`02.1_mod2.1.tbl`)
+
+# SAVE
+# gtsave(as_gt(`02.1_mod2.1.tbl`),
+#        file = file.path(paste0(HOME,"/02.1_mod2.1.tbl.png")))
+
+# REMOVE
+rm(`02.1_mod2.1.tbl`, mod2.1)
+rm(AIC.TABLE, AIC, AIC.min, dAIC, i, list, Model, Variable)
+
+#-------------------------------------------------------------------------------------------------------------
+
+SUBSET <- TRACKPLATES[TRACKPLATES$HABITAT == "WFS" & TRACKPLATES$PLATE_LOC == "CLOSE",] #462
+
+# BEST MODELS - BINOMIAL
+#-----------------------
+
+# mod 2.1 [BEST AIC]
+mod2.1 <- glmer(SLUG_TRACKS_BIN ~ LIGHT_TRMT * TEMP + (1|STUDY.SITE) + (1|SAMP_ID), data = SUBSET, family = binomial)
+
+`02.1_mod2.1.tbl` <- tbl_regression(mod2.1, 
+                                    intercept = T,
+                                    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+                                    estimate_fun = ~ style_number(.x, digits = 3)) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**SLUG_TRACKS_BIN ~ LIGHT * TEMP + (1|STUDY SITE) + (1|SAMP_ID)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(`02.1_mod2.1.tbl`)
+# print(`02.1_mod2.1.tbl`)
+
+rm(`02.1_mod2.1.tbl`, mod2.1)
+
+# FINAL REMOVE
+##############
+
+rm(TRACKPLATES, SUBSET)
+
+```
+
+# 03.0 - HERBIVORY IN POTS / DATA FORMATING & EXPLORATORY PLOTS
+
+```{r 03.0 HERBIVORY IN POTS DATA FORMATING & EXPLORATORY PLOTS, fig.width = 10, message = FALSE, warning = FALSE}
+
+# 03.0 FORMAT DATA
+##################
+
+# ADD LIGHT TREATMENT
+#--------------------
+CEPO$S_LIGHT_TRMT <- NA
+
+for(i in (1:nrow(CEPO))){
+  
+  i.STU_SI <- CEPO$S_STU.SI[i]
+  ifelse(
+    
+    # STATEMENT
+    i.STU_SI %in% LIT.SITE,
+    
+    # IF YES
+    CEPO$S_LIGHT_TRMT[i] <- "LIT",
+    
+    # IF NO
+    CEPO$S_LIGHT_TRMT[i] <- "DARK")}
+
+rm(i.STU_SI, i)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# DATE
+#-----
+CEPO$S_DATE <- str_replace_all(CEPO$S_DATE, "-", "/")
+CEPO$S_DATE <- str_replace_all(CEPO$S_DATE, "2023", "23")
+CEPO$S_DATE <- str_replace_all(CEPO$S_DATE, "/23", "/2023")
+
+CEPO$S_DATE <- as.Date(CEPO$S_DATE, format = "%d/%m/%Y", origin = "01/01/1970")
+CEPO$S_DATE_DOY <- yday(CEPO$S_DATE)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# ADD ABIOTIC
+#############
+
+CEPO$TEMP <- NA
+CEPO$RAIN <- NA
+
+# SAMP ID (+1 because recovered the day after!)
+#----------------------------------------------
+CEPO$S_DATE <- as.Date(CEPO$S_DATE, format = "%d-%m-%y")
+CEPO$SAMP_ID_AFTER <- format(CEPO$S_DATE  + 1, format = "%y%m%d")
+CEPO$SAMP_ID <- format(CEPO$S_DATE, format = "%y%m%d")
+
+# REMOVE OLD SAMP ID
+CEPO$S_SAMP.ID <- NULL
+
+for(i in (1:nrow(CEPO))){
+
+  # i <- 43
+  
+  ifelse(
+    
+    # ARGUMENT
+    CEPO$S_TIME.PER[i] == "NIGHT",
+    
+    # IF YES = NIGHT
+    {i.SAMP_ID <- CEPO$SAMP_ID_AFTER[i]
+     i.ABIOTIC <- ABIOTIC[ABIOTIC$DATE == i.SAMP_ID,]
+     CEPO$RAIN[i] <- i.ABIOTIC$RAIN_SUM12H[i.ABIOTIC$TIME == "08h00"]
+     CEPO$TEMP[i] <- i.ABIOTIC$TEMP_12H[i.ABIOTIC$TIME == "08h00"]},
+    
+    # IF NO = DAY
+    {i.SAMP_ID <- CEPO$SAMP_ID[i]
+     i.ABIOTIC <- ABIOTIC[ABIOTIC$DATE == i.SAMP_ID,]
+     CEPO$RAIN[i] <- i.ABIOTIC$RAIN_SUM12H[i.ABIOTIC$TIME == "20h00"]
+     CEPO$TEMP[i] <- i.ABIOTIC$TEMP_12H[i.ABIOTIC$TIME == "20h00"]})
+  
+}
+
+rm(i, i.SAMP_ID, i.ABIOTIC)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# RAIN BINOMIAL
+CEPO$RAIN_BIN <- NA
+
+for(i in (1:nrow(CEPO))){
+  
+  ifelse(
+    
+    # ARGUMENT
+    CEPO$RAIN[i] > 0,
+    
+    # IF YES
+    CEPO$RAIN_BIN[i] <- "YES",
+
+    # IF NO
+    CEPO$RAIN_BIN[i] <- "NO")
+  
+}
+
+#-------------------------------------------------------------------------------------------------------------
+
+# HERBIVORY METRICS - LEA PROP & LEA ABS
+########################################
+
+CEPO$LEA.PROP <- NA
+CEPO$LEA_ABS <- NA
+CEPO$LEA.SEVER <- NA
+
+# THRESHOLD <- 0
+THRESHOLD <- 0.1
+
+# FOR LOOP
+for(i in (1:nrow(CEPO))){
+  
+  # i <- 79
+  # print(CEPO$P_PL_LABEL[i])
+  
+  i.CEPO <- CEPO[i,]
+  
+  # LEAVE DAMAGES PROPORTION
+  #-------------------------
+  
+    # BEFORE
+    zero.ls.BEF <- c(i.CEPO$LEA_DAM0_BEFORE, i.CEPO$LEA_DAM1_BEFORE, i.CEPO$LEA_DAM2_BEFORE, i.CEPO$LEA_DAM3_BEFORE, 
+                     i.CEPO$LEA_DAM4_BEFORE, i.CEPO$LEA_DAM5_BEFORE, i.CEPO$LEA_DAM6_BEFORE, i.CEPO$LEA_DAM7_BEFORE, 
+                     i.CEPO$LEA_DAM8_BEFORE, i.CEPO$LEA_DAM9_BEFORE)
+    
+    zero.ls.BEF.n <- length(zero.ls.BEF[!is.na(zero.ls.BEF)])
+    i.LEA.PROP.BEF <- 1 - ((length(zero.ls.BEF[zero.ls.BEF <= THRESHOLD & !is.na(zero.ls.BEF)])) / zero.ls.BEF.n)
+    
+    # AFTER
+    zero.ls.AFT <- c(i.CEPO$LEA_DAM0_AFTER, i.CEPO$LEA_DAM1_AFTER, i.CEPO$LEA_DAM2_AFTER, i.CEPO$LEA_DAM3_AFTER, 
+                     i.CEPO$LEA_DAM4_AFTER, i.CEPO$LEA_DAM5_AFTER, i.CEPO$LEA_DAM6_AFTER, i.CEPO$LEA_DAM7_AFTER, 
+                     i.CEPO$LEA_DAM8_AFTER, i.CEPO$LEA_DAM9_AFTER)
+    
+    zero.ls.AFT.n <- length(zero.ls.AFT[!is.na(zero.ls.AFT)])  
+    i.LEA.PROP.AFT <- 1 - ((length(zero.ls.AFT[zero.ls.AFT <= THRESHOLD & !is.na(zero.ls.AFT)])) / zero.ls.AFT.n)
+  
+    # DIFFERENCE
+    CEPO$LEA.PROP[i] <- i.LEA.PROP.AFT - i.LEA.PROP.BEF
+    
+    # NEGATIVE, REPLACED WITH 0
+    ifelse(
+    
+      # ARGUMENT
+      CEPO$LEA.PROP[i] < 0,
+      
+      # IF YES
+      CEPO$LEA.PROP[i] <- 0,
+      
+      # IF NO
+      CEPO$LEA.PROP[i] <- CEPO$LEA.PROP[i])
+  
+  # ABSOLUTE NUMBER OF EATEN LEAVES
+  #--------------------------------
+  
+    # BEFORE
+    zero.ls.BEF.n <- length(zero.ls.BEF[!is.na(zero.ls.BEF) & zero.ls.BEF > THRESHOLD])
+      
+    # AFTER
+    zero.ls.AFT.n <- length(zero.ls.AFT[!is.na(zero.ls.BEF) & zero.ls.AFT > THRESHOLD])
+  
+    # DIFFERENCE
+    CEPO$LEA_ABS[i] <- zero.ls.AFT.n - zero.ls.BEF.n
+    
+    # NEGATIVE, REPLACED WITH 0
+    ifelse(
+    
+      # ARGUMENT
+      CEPO$LEA_ABS[i] < 0,
+      
+      # IF YES
+      CEPO$LEA_ABS[i] <- 0,
+      
+      # IF NO
+      CEPO$LEA_ABS[i] <- CEPO$LEA_ABS[i])
+    
+  # LEAVE SEVERITY
+  #---------------
+  
+  # BEFORE
+  ifelse(
+
+    # ARGUMENT
+    mean(zero.ls.BEF, na.rm = T) == 0,
+
+    # IF YES
+    i.LEA.SEVER.BEF <- 0,
+
+    # IF NO
+    i.LEA.SEVER.BEF <- mean(zero.ls.BEF[which(zero.ls.BEF > THRESHOLD)], na.rm = T))    
+
+  # AFTER
+  ifelse(
+
+    # ARGUMENT
+    mean(zero.ls.AFT, na.rm = T) == 0,
+
+    # IF YES
+    i.LEA.SEVER.AFT <- 0,
+
+    # IF NO
+    i.LEA.SEVER.AFT <- mean(zero.ls.AFT[which(zero.ls.AFT > THRESHOLD)], na.rm = T))
+  
+  # DIFFERENCE
+  CEPO$LEA.SEVER[i] <- i.LEA.SEVER.AFT - i.LEA.SEVER.BEF
+  
+  # NEGATIVE, REPLACED WITH 0
+  ifelse(
+    
+    # ARGUMENT
+    CEPO$LEA.SEVER[i] < 0,
+    
+    # IF YES
+    CEPO$LEA.SEVER[i] <- 0,
+    
+    # IF NO
+    CEPO$LEA.SEVER[i] <- CEPO$LEA.SEVER[i])
+
+}
+
+rm(i.CEPO, i, i.LEA.PROP.AFT, i.LEA.PROP.BEF, i.LEA.SEVER.AFT, i.LEA.SEVER.BEF, THRESHOLD)
+rm(zero.ls.AFT, zero.ls.AFT.n, zero.ls.BEF, zero.ls.BEF.n)
+
+# EATEN LEAVES BINOMIAL
+CEPO$LEA_ABS_BIN <- NA
+
+for(i in (1:nrow(CEPO))){
+  
+  ifelse(
+    
+    # ARGUMENT
+    CEPO$RAIN[i] > 0,
+    
+    # IF YES
+    CEPO$LEA_ABS_BIN[i] <- 1,
+
+    # IF NO
+    CEPO$LEA_ABS_BIN[i] <- 0)
+  
+}
+#-------------------------------------------------------------------------------------------------------------
+
+# HERBIVORY METRICS - LEA SEVERITY
+##################################
+
+DAMAGE <- data.frame(
+    
+    LABEL = NA,
+    DAY = NA,
+    SAMPLING = NA,
+    TREA_TIME = NA,
+    TREA_LIGHT = NA,
+    STUDY_SITE = NA,
+    TEMP = NA,
+    RAIN = NA,
+    DAMAGES = NA)
+
+# FOR LOOP
+#----------
+for(i in (1:nrow(CEPO))){
+  
+  # i <- 45
+  # print(i)
+  
+  i.CEPO <- CEPO[i,]
+  i.LABEL <- i.CEPO$P_PL_LABEL
+
+  # EMPTY DATA FRAME
+  #-----------------
+  i.DAMAGE <- DAMAGE[1,]
+  
+  # FILL DAMAGES
+  #-------------
+  i.DAMAGES.AFT <- sort(c(i.CEPO$LEA_DAM0_AFTER, i.CEPO$LEA_DAM1_AFTER, i.CEPO$LEA_DAM2_AFTER, i.CEPO$LEA_DAM3_AFTER, 
+                          i.CEPO$LEA_DAM4_AFTER, i.CEPO$LEA_DAM5_AFTER, i.CEPO$LEA_DAM6_AFTER, i.CEPO$LEA_DAM7_AFTER, 
+                          i.CEPO$LEA_DAM8_AFTER, i.CEPO$LEA_DAM9_AFTER))
+  
+  i.DAMAGES.BEF <- sort(c(i.CEPO$LEA_DAM0_BEFORE, i.CEPO$LEA_DAM1_BEFORE, i.CEPO$LEA_DAM2_BEFORE, i.CEPO$LEA_DAM3_BEFORE, 
+                          i.CEPO$LEA_DAM4_BEFORE, i.CEPO$LEA_DAM5_BEFORE, i.CEPO$LEA_DAM6_BEFORE, i.CEPO$LEA_DAM7_BEFORE, i.CEPO$LEA_DAM8_BEFORE, i.CEPO$LEA_DAM9_BEFORE))
+  
+  i.DAMAGES <- i.DAMAGES.AFT - i.DAMAGES.BEF
+  
+  # REPEAT THE EMPTY DATAFRAME N TIMES (N = length(i.DAMAGES))
+  #-----------------------------------------------------------
+  i.DAMAGE <- i.DAMAGE[rep(seq_len(nrow(i.DAMAGE)), length(i.DAMAGES)), ]
+  i.DAMAGE$DAMAGES <- i.DAMAGES
+
+  # FILL SAMPLING INFOS
+  #--------------------
+  i.DAMAGE$LABEL <- i.LABEL
+  i.DAMAGE$DAY <- as.Date(i.CEPO$S_DATE)
+  i.DAMAGE$SAMPLING <- as.character(i.CEPO$SAMP_ID_AFTER)
+  i.DAMAGE$TREA_TIME <- i.CEPO$S_TIME.PER
+  i.DAMAGE$TREA_LIGHT <- i.CEPO$S_LIGHT_TRMT
+  i.DAMAGE$TREA_LIGHT <- i.CEPO$S_LIGHT_TRMT
+  i.DAMAGE$STUDY_SITE <- i.CEPO$S_STU.SI
+  i.DAMAGE$TEMP <- (i.CEPO$TEMP_AFTER + i.CEPO$TEMP_BEFORE) / 2
+  i.DAMAGE$RAIN <- (i.CEPO$RAIN_3H_AFTER + i.CEPO$RAIN_3H_BEFORE) / 2
+
+  # MERGE
+  DAMAGE <- rbind(DAMAGE, i.DAMAGE)
+  
+}
+
+rm(i.CEPO, i.DAMAGE, i, i.DAMAGES, i.LABEL, i.DAMAGES.AFT, i.DAMAGES.BEF)
+
+# CLEAN
+#------
+
+# Remove first line full of NA's 
+DAMAGE <- DAMAGE[-1,] # 4170
+
+# Remove NA's
+DAMAGE <- DAMAGE[!is.na(DAMAGE$DAMAGES),] # 3645
+
+# Transform negative into zeroes
+for(i in (1:nrow(DAMAGE))){
+  
+  ifelse(
+      
+    # ARGUMENT
+    DAMAGE$DAMAGES[i] < 0,
+    
+    # IF YES
+    DAMAGE$DAMAGES[i] <- 0,
+    
+    # IF NO
+    DAMAGE$DAMAGES[i] <- DAMAGE$DAMAGES[i])  
+  
+}
+
+# Remove zeroes
+DAMAGE <- DAMAGE[DAMAGE$DAMAGES > 0,] # 742
+
+# RAIN BINOMIAL
+DAMAGE$RAIN_BIN <- NA
+
+for(i in (1:nrow(DAMAGE))){
+  
+  ifelse(
+    
+    # ARGUMENT
+    DAMAGE$RAIN[i] > 0,
+    
+    # IF YES
+    DAMAGE$RAIN_BIN[i] <- "YES",
+
+    # IF NO
+    DAMAGE$RAIN_BIN[i] <- "NO")
+  
+}
+
+```
+
+# 03.1 - HERBIVORY IN POTS / MODELS 
+
+```{r 03.1 HERBIVORY IN POTS MODELS, fig.width = 10, message = FALSE, warning = FALSE}
+
+SUBSET <- CEPO
+
+# 03.11 - NUMBER OF EATEN LEAVES
+################################
+
+`03.11_ABS_LEA` <- ggplot(data = SUBSET,
+    aes(
+      x = LEA_ABS,
+      y = S_TIME.PER,
+      fill = S_TIME.PER,
+      pattern = S_LIGHT_TRMT)) +
+  geom_boxplot_pattern(color = "black",
+    pattern_fill = "burlywood",
+    pattern_angle = 45,
+    pattern_density = 0.5,
+    pattern_color = NA,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  geom_jitter(alpha = 0.3) +
+  scale_pattern_manual(
+    values = c("LIT" = "stripe", "DARK"  = "none"),
+    name = "Treatment",
+    labels = c("Dark", "Light")) +
+  scale_fill_manual(values = c("white", "grey50")) +
+  theme_minimal() +
+  guides(fill = "none") +
+  labs(
+    title = "Number of leaves with fresh damages \nafter 12 h of treatment",
+    x = "Number of damaged leaves",
+    y = "Time period") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = c(0.9, 0.9),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`03.11_ABS_LEA`)
+# ggsave(filename = "03.11_ABS_LEA.jpeg",
+#          plot = `03.11_ABS_LEA`, path = HOME,
+#          height = 8, width = 16, units = "cm")
+
+# REMOVE
+rm(`03.11_ABS_LEA`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MODEL SELECTION
+#----------------
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "AIC" = 9999,
+  "d.AIC" = 9999)
+
+# THREE COVARIABLES
+#------------------
+
+# mod3.1
+mod3.1 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER * S_LIGHT_TRMT * TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod3.1"
+Variable <- "S_TIME.PER * S_LIGHT_TRMT * TEMP"
+AIC <- AIC(mod3.1)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.1)
+
+# mod3.2
+mod3.2 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER + S_LIGHT_TRMT + TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod3.2"
+Variable <- "S_TIME.PER + S_LIGHT_TRMT + TEMP"
+AIC <- AIC(mod3.2)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.2)
+
+# mod3.3
+mod3.3 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER * S_LIGHT_TRMT + TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod3.3"
+Variable <- "S_TIME.PER * S_LIGHT_TRMT + TEMP"
+AIC <- AIC(mod3.3)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.3)
+
+# mod3.4
+mod3.4 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER + S_LIGHT_TRMT * TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod3.4"
+Variable <- "S_TIME.PER + S_LIGHT_TRMT * TEMP"
+AIC <- AIC(mod3.4)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.4)
+
+# TWO VARIABLES
+#--------------
+
+#mod2.1
+mod2.1 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER * S_LIGHT_TRMT + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod2.1"
+Variable <- "S_TIME.PER * S_LIGHT_TRMT"
+AIC <- AIC(mod2.1)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1)
+
+#mod2.2
+mod2.2 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER + S_LIGHT_TRMT + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod2.2"
+Variable <- "S_TIME.PER + S_LIGHT_TRMT"
+AIC <- AIC(mod2.2)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.2)
+
+#mod2.3
+mod2.3 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER * TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod2.3"
+Variable <- "S_TIME.PER * TEMP"
+AIC <- AIC(mod2.3)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.3)
+
+#mod2.4
+mod2.4 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER + TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod2.4"
+Variable <- "S_TIME.PER + TEMP"
+AIC <- AIC(mod2.4)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.4)
+
+#mod2.5
+mod2.5 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_LIGHT_TRMT * TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod2.5"
+Variable <- "S_LIGHT_TRMT * TEMP"
+AIC <- AIC(mod2.5)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.5)
+
+#mod2.6
+mod2.6 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_LIGHT_TRMT + TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod2.6"
+Variable <- "S_LIGHT_TRMT + TEMP"
+AIC <- AIC(mod2.6)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.6)
+
+# ONE VARIABLE
+#-------------
+
+# mod1.1 
+mod1.1 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod1.1"
+Variable <- "S_TIME.PER"
+AIC <- AIC(mod1.1)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1)
+
+# mod1.2
+mod1.2 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_LIGHT_TRMT + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod1.2"
+Variable <- "S_LIGHT_TRMT"
+AIC <- AIC(mod1.2)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.2)
+
+# mod1.3
+mod1.3 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod1.3"
+Variable <- "TEMP"
+AIC <- AIC(mod1.3)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.3)
+
+# ZERO VARIABLE
+#--------------
+
+# mod0
+mod0 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ 1 + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family = binomial)
+
+Model <- "mod0"
+Variable <- "1"
+AIC <- AIC(mod0)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod0)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(i in (1:nrow(AIC.TABLE))){
+  
+  AIC.TABLE$d.AIC[i] <- round(AIC.TABLE$AIC[i] - AIC.min, 2)
+  
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# BEST MODELS (mod 3.3)
+#----------------------
+
+# mod 3.3 [BEST AIC]
+mod03.11 <- glmer(cbind(LEA_ABS, 10 - LEA_ABS) ~ S_TIME.PER * S_LIGHT_TRMT + TEMP + (1|S_STU.SI) + (1|SAMP_ID_AFTER), data = SUBSET, family =binomial)
+
+`mod03.11.tbl` <- tbl_regression(mod03.11, intercept = T) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**cbind(N DAMAGED LEAVES, 10 - N DAMAGED LEAVES) ~ LIGHT * TIME PERIOD + TEMP, fam = binomial**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(`mod03.11.tbl`)
+# print(`mod03.11.tbl`)
+
+# SAVE
+# gtsave(as_gt(`mod03.11.tbl`),
+#        file = file.path(paste0(HOME,"/mod03.11.tbl.png")))
+
+# REMOVE
+rm(`mod03.11.tbl`, mod03.11)
+rm(AIC.TABLE, AIC, AIC.min, dAIC, i, list, Model, Variable)
+
+##############################################################################################################
+
+# 03.12 - SEVERITY OF DAMAGES
+#############################
+
+# SUBSET
+#-------
+SUBSET <- DAMAGE
+
+# PLOT
+#-----
+`03.12_SEVER_LEA` <- ggplot(data = SUBSET, 
+    aes(
+      x = DAMAGES,
+      y = TREA_TIME,
+      fill = TREA_TIME,
+      pattern = TREA_LIGHT)) +
+  geom_boxplot_pattern(color = "black",
+    pattern_fill = "burlywood",
+    pattern_angle = 45,
+    pattern_density = 0.5,
+    pattern_color = NA,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  geom_jitter(alpha = 0.1) +
+  scale_pattern_manual(
+    values = c("LIT" = "stripe", "DARK"  = "none"),
+    name = "Treatment",
+    labels = c("Dark", "Light")) +
+  scale_fill_manual(values = c("white", "grey50")) +
+  theme_minimal() +
+  scale_x_continuous(
+    labels = scales::percent,
+    limits = c(0, 1)) +
+  guides(fill = "none") +
+  labs(
+    title = "Severity of damaged leaves \nafter 12 hours of treatment",
+    x = "Severity of damages on leaves [%]",
+    y = "Time period") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = c(0.9, 0.9),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`03.12_SEVER_LEA`)
+# ggsave(filename = "03.12_SEVER_LEA.jpeg",
+#          plot = `03.12_SEVER_LEA`, path = HOME,
+#          height = 8, width = 16, units = "cm")
+
+# REMOVE
+rm(`03.12_SEVER_LEA`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MODEL SELECTION
+#----------------
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "anova.p" = 9999,
+  "anova.dAIC" = 9999,
+  "AIC" = 9999,
+  "BIC" = 9999)
+
+# THREE COVARIABLES
+#------------------
+
+# mod3.1
+mod3.1.light <- lmer(DAMAGES ~ TREA_LIGHT * TREA_TIME * TEMP + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod3.1 <- lmer(DAMAGES ~ TREA_TIME * TEMP + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod3.1"
+Variable <- "TREA_LIGHT * TREA_TIME * TEMP"
+
+anova <- anova(mod3.1, mod3.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.1, mod3.1.light)
+
+# mod3.2
+mod3.2.light <- lmer(DAMAGES ~ TREA_LIGHT + TREA_TIME + TEMP + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod3.2 <- lmer(DAMAGES ~ TREA_TIME + TEMP + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod3.2"
+Variable <- "TREA_LIGHT + TREA_TIME + TEMP"
+
+anova <- anova(mod3.2, mod3.2.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.2, mod3.2.light)
+
+# mod3.3
+mod3.3.light <- lmer(DAMAGES ~ TREA_LIGHT * TREA_TIME + TEMP + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod3.3 <- lmer(DAMAGES ~ TREA_TIME + TEMP + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod3.3"
+Variable <- "TREA_LIGHT * TREA_TIME + TEMP"
+
+anova <- anova(mod3.3, mod3.3.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.3, mod3.3.light)
+
+# mod3.4
+mod3.4.light <- lmer(DAMAGES ~ TREA_LIGHT + TREA_TIME * TEMP + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod3.4 <- lmer(DAMAGES ~ TREA_TIME * TEMP + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod3.4"
+Variable <- "TREA_LIGHT + TREA_TIME * TEMP"
+
+anova <- anova(mod3.4, mod3.4.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.4, mod3.4.light)
+
+# TWO VARIABLES
+#--------------
+
+#mod2.1 TREA_LIGHT * TREA_TIME
+mod2.1.light <- lmer(DAMAGES ~ TREA_LIGHT * TREA_TIME + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod2.1 <- lmer(DAMAGES ~ TREA_TIME + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod2.1"
+Variable <- "TREA_LIGHT * TREA_TIME"
+
+anova <- anova(mod2.1, mod2.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1, mod2.1.light)
+
+#mod2.2 TREA_LIGHT + TREA_TIME
+mod2.2.light <- lmer(DAMAGES ~ TREA_LIGHT + TREA_TIME + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod2.2 <- lmer(DAMAGES ~ TREA_TIME + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod2.2"
+Variable <- "TREA_LIGHT + TREA_TIME"
+
+anova <- anova(mod2.2, mod2.2.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.2, mod2.2.light)
+
+#mod2.3 TREA_LIGHT * TEMP
+mod2.3.light <- lmer(DAMAGES ~ TREA_LIGHT * TEMP + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod2.3 <- lmer(DAMAGES ~ TEMP + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod2.3"
+Variable <- "TREA_LIGHT * TEMP"
+
+anova <- anova(mod2.3, mod2.3.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.3, mod2.3.light)
+
+#mod2.4 TREA_LIGHT + TEMP
+mod2.4.light <- lmer(DAMAGES ~ TREA_LIGHT + TEMP + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod2.4 <- lmer(DAMAGES ~ TEMP + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod2.4"
+Variable <- "TREA_LIGHT + TEMP"
+
+anova <- anova(mod2.4, mod2.4.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.4, mod2.4.light)
+
+# ONE VARIABLE 
+#-------------
+
+# mod1.1 TREA_LIGHT
+mod1.1.light <- lmer(DAMAGES ~ TREA_LIGHT + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+mod1.1 <- lmer(DAMAGES ~ 1 + (1|LABEL) + (1|STUDY_SITE), data = SUBSET)
+
+Model <- "mod1.1"
+Variable <- "TREA_LIGHT"
+
+anova <- anova(mod1.1, mod1.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1, mod1.1.light)
+
+rm(anova, anova.dAIC, anova.p, BIC, THRESHOLD)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+AIC.TABLE$d.AIC <- NA
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(i in (1:nrow(AIC.TABLE))){
+  
+  AIC.TABLE$d.AIC[i] <- round(AIC.TABLE$AIC[i] - AIC.min, 2)
+  
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# BEST MODELS
+#------------
+
+# mod 3.1
+mod03.12 <- lmer(log(DAMAGES) ~ TREA_LIGHT * TREA_TIME + TEMP + (1|LABEL) + (1|STUDY_SITE) + (1|SAMPLING), data = SUBSET)
+res <- residuals(mod03.12)
+qqnorm(res)
+qqline(res)
+
+mod03.12.tbl <- tbl_regression(mod03.12, intercept = T) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**DAM LEAVES ~ LIGHT * TIME PERIOD + TEMP**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(mod03.12.tbl)
+# print(mod03.12.tbl)
+
+# SAVE
+# gtsave(as_gt(`03.11_mod3.1.light.tbl`),
+#        file = file.path(paste0(HOME,"/03.11_mod3.1.light.tbl.png")))
+
+# REMOVE
+rm(mod03.12, mod03.12.tbl)
+rm(AIC.TABLE, AIC, AIC.min, i, list, Model, Variable)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# FINAL REMOVE
+##############
+
+rm(CEPO, DAMAGE)
+
+```
+
+# 04.0 - SLUGS TRANSECTS / DATA FORMATING
+
+```{r 04.0 SLUGS TRANSECTS DATA FORMATING, fig.width = 10, message = FALSE, warning = FALSE}
+
+# 04.0 REFORMAT (N SLUGS PER LIGHT DISTANCE)
+#############################################
+
+# GENUS SNAIL:
+INTERACTIONS$GENUS[INTERACTIONS$ART_GROUP == "SNAIL"] <- "Snail"
+
+# SAMPLING LONG
+INTERACTIONS.ALL$SAMPLING.LONG <- paste0(INTERACTIONS.ALL$SAMPLING, ".", INTERACTIONS.ALL$SEGMENT)
+
+# STUDY_SITE.YEAR
+YEAR.ls <- c(rep(".22", length(DARK.SITE.22)), rep(".23", length(DARK.SITE)))
+SITE.ls <- c(DARK.SITE.22, DARK.SITE)
+DARK.ALL <- as.data.frame(cbind(SITE.ls, YEAR.ls))
+DARK.ALL.ls <- paste0(DARK.ALL$SITE.ls, DARK.ALL$YEAR.ls)
+rm(YEAR.ls, SITE.ls, DARK.ALL)
+
+# EMPTY DATA FRAME
+SAMPLING.HERB <- data.frame(
+    
+    YEAR = NA,
+    SP = NA,
+    STUDY_SITE = NA,
+    TIME = NA,
+    ARION = NA,
+    DEROCERAS = NA,
+    SNAIL = NA,
+    HERBIVORE = NA,
+    LIGHT = NA,
+    DISTANCE = NA,
+    SAMPLING = NA,
+    TEMP = NA,
+    RAIN = NA,
+    AREA = NA,
+    STUDY_SITE.YEAR = NA)
+
+# FOR LOOP
+#---------
+for(i in (1:length(SAMPLING.ls))){
+  
+  # i <- 25
+  
+  i.SAMPLING.HERB <- SAMPLING.HERB[1,]
+  i.SAMPLING.HERB[(1:4)] <- strsplit(SAMPLING.ls, ".", fixed = TRUE)[[i]][(1:4)]
+  i.SAMPLING.HERB$SAMPLING <- paste0(i.SAMPLING.HERB$YEAR,
+                                     ".",
+                                     i.SAMPLING.HERB$SP,
+                                     ".",
+                                     i.SAMPLING.HERB$STUDY_SITE,
+                                     ".",
+                                     i.SAMPLING.HERB$TIME)
+  
+  i.SAMPLING.HERB$TEMP <- mean(INTERACTIONS.ALL$TEMP[INTERACTIONS.ALL$SAMPLING == i.SAMPLING.HERB$SAMPLING])
+  i.SAMPLING.HERB$RAIN <- mean(INTERACTIONS.ALL$RAIN[INTERACTIONS.ALL$SAMPLING == i.SAMPLING.HERB$SAMPLING])
+  i.SAMPLING.HERB$STUDY_SITE.YEAR <- paste0(i.SAMPLING.HERB$STUDY_SITE, ".", i.SAMPLING.HERB$YEAR)
+  
+  i.SAMPLING.HERB <- do.call("rbind", replicate(3, i.SAMPLING.HERB, simplify = FALSE)) 
+  
+  i.SAMPLING.HERB$DISTANCE[1] <- "CLOSE"
+  i.SAMPLING.HERB$DISTANCE[2] <- "MIDDLE"
+  i.SAMPLING.HERB$DISTANCE[3] <- "FAR"
+  
+  ifelse(
+    
+    # ARGUMENT
+    unique(i.SAMPLING.HERB$STUDY_SITE.YEAR ) %in% DARK.ALL.ls,
+    
+    # IF YES
+    i.SAMPLING.HERB$LIGHT <- "DARK",
+    
+    # IF NO
+    i.SAMPLING.HERB$LIGHT <- "LIGHT")
+
+  # 2022
+  ######
+  
+  # STANDARD
+  #---------
+  
+  ifelse(
+    
+    # ARGUMENT
+    unique(i.SAMPLING.HERB$YEAR) == "22",
+
+      # IF YES
+      {
+      
+      # CLOSE    
+      i.SAMPLING.HERB$ARION[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T02", "P04", "P01") &
+        INTERACTIONS$GENUS == "Arion",])
+      
+      i.SAMPLING.HERB$DEROCERAS[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T02", "P04", "P01") &
+        INTERACTIONS$GENUS == "Deroceras",])
+         
+      i.SAMPLING.HERB$SNAIL[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T02", "P04", "P01") &
+        INTERACTIONS$GENUS == "Snail",])
+      
+      i.SAMPLING.HERB$AREA[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- 25
+
+      # FAR    
+      i.SAMPLING.HERB$ARION[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T03" ,"T04", "P02", "P03") &
+        INTERACTIONS$GENUS == "Arion",])
+         
+      i.SAMPLING.HERB$DEROCERAS[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T03" ,"T04", "P02", "P03") &
+        INTERACTIONS$GENUS == "Deroceras",])
+      
+      i.SAMPLING.HERB$SNAIL[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T03" ,"T04", "P02", "P03") &
+        INTERACTIONS$GENUS == "Snail",])
+      
+      i.SAMPLING.HERB$AREA[i.SAMPLING.HERB$DISTANCE == "FAR"] <- 25
+      
+      },
+    
+      # IF NO
+      
+      {
+      
+      i.SAMPLING.HERB$ARION <- i.SAMPLING.HERB$ARION
+      i.SAMPLING.HERB$DEROCERAS <- i.SAMPLING.HERB$DEROCERAS
+      i.SAMPLING.HERB$SNAIL <- i.SAMPLING.HERB$SNAIL
+      i.SAMPLING.HERB$AREA <- i.SAMPLING.HERB$AREA
+
+      }
+  )    
+
+  # SHORT TRANSECT
+  #---------------
+
+  ifelse(
+    
+    # ARGUMENT
+    unique(i.SAMPLING.HERB$YEAR) == "22" & unique(i.SAMPLING.HERB$STUDY_SITE) %in% c("PIZZA", "OAK"),
+
+      # IF YES
+      {
+      
+      # CLOSE    
+      i.SAMPLING.HERB$ARION[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T02", "T03", "P01", "P04") &
+        INTERACTIONS$GENUS == "Arion",])
+         
+      i.SAMPLING.HERB$DEROCERAS[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T02", "T03", "P01", "P04") &
+        INTERACTIONS$GENUS == "Deroceras",])
+      
+      i.SAMPLING.HERB$SNAIL[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T02", "T03", "P01", "P04") &
+        INTERACTIONS$GENUS == "Snail",])
+      
+      i.SAMPLING.HERB$AREA[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- 20
+      
+      # FAR    
+      i.SAMPLING.HERB$ARION[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T05", "TO6", "T07", "T04", "P02", "P03") &
+        INTERACTIONS$GENUS == "Arion",])
+         
+      i.SAMPLING.HERB$DEROCERAS[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T05", "TO6", "T07", "T04", "P02", "P03") &
+        INTERACTIONS$GENUS == "Deroceras",])
+         
+      i.SAMPLING.HERB$SNAIL[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T05", "TO6", "T07", "T04", "P02", "P03") &
+        INTERACTIONS$GENUS == "Snail",])
+      
+      i.SAMPLING.HERB$AREA[i.SAMPLING.HERB$DISTANCE == "FAR"] <- 20
+      
+      },
+    
+      # IF NO
+      {
+
+      i.SAMPLING.HERB$ARION <- i.SAMPLING.HERB$ARION
+      i.SAMPLING.HERB$DEROCERAS <- i.SAMPLING.HERB$DEROCERAS
+      i.SAMPLING.HERB$SNAIL <- i.SAMPLING.HERB$SNAIL
+      i.SAMPLING.HERB$AREA <- i.SAMPLING.HERB$AREA
+      
+      }
+  )    
+  
+  # 2023
+  ######
+  
+  ifelse(
+    
+    # ARGUMENT
+    unique(i.SAMPLING.HERB$YEAR) == "23",
+
+      # IF YES
+      {
+      
+      # CLOSE    
+      i.SAMPLING.HERB$ARION[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T04") &
+        INTERACTIONS$GENUS == "Arion",])
+         
+      i.SAMPLING.HERB$DEROCERAS[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T04") &
+        INTERACTIONS$GENUS == "Deroceras",])
+      
+      i.SAMPLING.HERB$SNAIL[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T01", "T04") &
+        INTERACTIONS$GENUS == "Snail",])      
+      i.SAMPLING.HERB$AREA[i.SAMPLING.HERB$DISTANCE == "CLOSE"] <- 16
+      
+      # FAR    
+      i.SAMPLING.HERB$ARION[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T02", "T03") &
+        INTERACTIONS$GENUS == "Arion",])
+         
+      i.SAMPLING.HERB$DEROCERAS[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T02", "T03") &
+        INTERACTIONS$GENUS == "Deroceras",])
+
+      i.SAMPLING.HERB$SNAIL[i.SAMPLING.HERB$DISTANCE == "FAR"] <- nrow(
+        INTERACTIONS[INTERACTIONS$SAMPLING == unique(i.SAMPLING.HERB$SAMPLING) &
+        INTERACTIONS$SEGMENT %in% c("T02", "T03") &
+        INTERACTIONS$GENUS == "Snail",])
+
+      i.SAMPLING.HERB$AREA[i.SAMPLING.HERB$DISTANCE == "FAR"] <- 16
+      
+      },
+    
+      # IF NO
+      {
+      
+      i.SAMPLING.HERB$ARION <- i.SAMPLING.HERB$ARION
+      i.SAMPLING.HERB$DEROCERAS <- i.SAMPLING.HERB$DEROCERAS
+      i.SAMPLING.HERB$SNAIL <- i.SAMPLING.HERB$SNAIL
+      i.SAMPLING.HERB$AREA <- i.SAMPLING.HERB$AREA    
+      
+      }
+  )    
+
+  # APPEND
+  SAMPLING.HERB <- rbind(SAMPLING.HERB, i.SAMPLING.HERB)
+
+}
+    
+# REMOVE FIRST LINE OF NA's
+SAMPLING.HERB <- SAMPLING.HERB[-1,]
+rm(i.SAMPLING.HERB, i)
+
+# TOT N HERBIVORES
+SAMPLING.HERB$HERBIVORE <- SAMPLING.HERB$ARION + SAMPLING.HERB$SNAIL + SAMPLING.HERB$DEROCERAS
+
+# TOT SLUGS
+SAMPLING.HERB$SLUG <- SAMPLING.HERB$ARION + SAMPLING.HERB$DEROCERAS
+
+# REMOVE DUPLICATED VALUES
+SAMPLING.HERB <- SAMPLING.HERB[!duplicated(SAMPLING.HERB), ]
+
+# REMOVE MIDDLE
+SAMPLING.HERB <- SAMPLING.HERB[!SAMPLING.HERB$DISTANCE == "MIDDLE",]
+
+# CHANGE FACTOR LEVEL (CLOSE, FAR)
+SAMPLING.HERB$DISTANCE <- as.factor(SAMPLING.HERB$DISTANCE)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# ADD PAIRING
+#------------
+SAMPLING.HERB$PAIRS <- NA
+
+for(i in (1:nrow(SAMPLING.HERB))){
+  
+  i.STUDY_SITE.YEAR <- SAMPLING.HERB$STUDY_SITE.YEAR[i]
+  i.SP <- SAMPLING.HERB$SP[i]
+  
+  # 2022
+  ifelse(i.STUDY_SITE.YEAR %in% c("ANTS.22", "BADGER.22"), 
+         SAMPLING.HERB$PAIRS[i] <- "22.SOUTH", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("DEER.22", "FOX.22"), 
+         SAMPLING.HERB$PAIRS[i] <- "22.VULLY", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])  
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("JUNGLE.22", "OAK.22"), 
+         SAMPLING.HERB$PAIRS[i] <- "22.SALAVAUX", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])   
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("PIZZA.22", "TRAIN II.22"), 
+         SAMPLING.HERB$PAIRS[i] <- "22.NORTH", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])   
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("RABBIT.22", "KINGFISHER.22"), 
+         SAMPLING.HERB$PAIRS[i] <- "22.SUGIEZ", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])   
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("STORK.22", "VOLE.22"), 
+         SAMPLING.HERB$PAIRS[i] <- "22.AVENCHES", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])   
+
+  # 2023
+  ifelse(i.STUDY_SITE.YEAR %in% c("MARTEN.23", "BADGER.23"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.MUSTELID", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])     
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("ANTS.23", "HORNET.23"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.HYMENO", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])     
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("QUAIL.23", "UPUPA.23"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.WALKINGBIRD", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("TOAD.23", "NEWT.23"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.AMPHIBIAN", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("EAGLE.23", "PEREGRINE.23"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.RAPTOR", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])
+
+  # 2023 - SP01 - SP03
+  ifelse(i.STUDY_SITE.YEAR %in% c("LIZARD.23", "GRASS SNAKE.23") & i.SP %in% c("SP01", "SP02", "SP03"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.REPTILE", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])     
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("WOODPECKER.23", "YELFAR HAMMER.23") & i.SP %in% c("SP01", "SP02", "SP03"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.FLYINGBIRD", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])  
+  
+  ifelse(i.STUDY_SITE.YEAR %in% c("CHAMOIS.23", "DEER.23") & i.SP %in% c("SP01", "SP02", "SP03"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.UNGULATE", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])  
+
+  # 2023 - SP04 - SP05
+  ifelse(i.STUDY_SITE.YEAR %in% c("LIZARD.23", "WOODPECKER.23") & i.SP %in% c("SP04", "SP05"), 
+         SAMPLING.HERB$PAIRS[i] <- "23.MIXED", SAMPLING.HERB$PAIRS[i] <- SAMPLING.HERB$PAIRS[i])     
+  }
+
+SAMPLING.HERB$PAIRS.SAMPLING <- paste0(SAMPLING.HERB$PAIRS, ".", SAMPLING.HERB$SP)
+
+##############################################################################################################
+
+# REMOVE SAMPLINGS WHERE NO HERBIVORES WHERE FOUND [BASED ON PAIRING]
+#####################################################################
+
+# SLUG
+#-----
+REMOVE.ls <- NA
+
+for(i in unique(SAMPLING.HERB$PAIRS.SAMPLING)){
+  
+  i.HERBS.tot <- sum(SAMPLING.HERB$SLUG[SAMPLING.HERB$PAIRS.SAMPLING == i])
+  
+  ifelse(
+    
+    # ARGUMENT
+    # i.HERBS.tot == 0,
+    i.HERBS.tot < 2, 
+    
+    # IF YES
+    REMOVE.ls <- append(REMOVE.ls, i),
+    
+    # IF NO
+    REMOVE.ls <- REMOVE.ls)
+
+}
+
+REMOVE.ls <- REMOVE.ls[-1]
+
+# REMOVE STUDY SITES
+#-------------------
+SAMPLING.SLUG <- SAMPLING.HERB[!SAMPLING.HERB$PAIRS.SAMPLING %in% REMOVE.ls,] # 96 samplings left
+rm(REMOVE.ls, i.HERBS.tot, i, PAIRED.ls)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# ARION
+#------
+REMOVE.ls <- NA
+
+for(i in unique(SAMPLING.HERB$PAIRS.SAMPLING)){
+  
+  i.HERBS.tot <- sum(SAMPLING.HERB$ARION[SAMPLING.HERB$PAIRS.SAMPLING == i])
+  
+  ifelse(
+    
+    # ARGUMENT
+    # i.HERBS.tot == 0,
+    i.HERBS.tot < 2, 
+    
+    # IF YES
+    REMOVE.ls <- append(REMOVE.ls, i),
+    
+    # IF NO
+    REMOVE.ls <- REMOVE.ls)
+
+}
+
+REMOVE.ls <- REMOVE.ls[-1]
+
+# REMOVE STUDY SITES
+#-------------------
+SAMPLING.ARION <- SAMPLING.HERB[!SAMPLING.HERB$PAIRS.SAMPLING %in% REMOVE.ls,] # 80 samplings left
+rm(REMOVE.ls, i.HERBS.tot, i, PAIRED.ls)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# Deroceras
+#----------
+REMOVE.ls <- NA
+
+for(i in unique(SAMPLING.HERB$PAIRS.SAMPLING)){
+  
+  i.HERBS.tot <- sum(SAMPLING.HERB$DEROCERAS[SAMPLING.HERB$PAIRS.SAMPLING == i])
+  
+  ifelse(
+    
+    # ARGUMENT
+    # i.HERBS.tot == 0,
+    i.HERBS.tot < 2, 
+    
+    # IF YES
+    REMOVE.ls <- append(REMOVE.ls, i),
+    
+    # IF NO
+    REMOVE.ls <- REMOVE.ls)
+
+}
+
+REMOVE.ls <- REMOVE.ls[-1]
+
+# REMOVE STUDY SITES
+#-------------------
+SAMPLING.DEROCERAS <- SAMPLING.HERB[!SAMPLING.HERB$PAIRS.SAMPLING %in% REMOVE.ls,] # 24 samplings left
+rm(REMOVE.ls, i.HERBS.tot, i)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# REFORMAT SAMPLING SLUGS (FOR FINAL MODEL)
+#------------------------------------------
+
+# Create a new variable for slug species
+SAMPLING.SLUG$SPECIES <- NA
+
+# Create an empty data frame
+SAMPLING <- SAMPLING.SLUG[1,]
+SAMPLING[1,] <- NA
+
+# Fill empty data frame
+for(i in (1:nrow(SAMPLING.SLUG))){
+  
+  # i <- 12
+  
+  i.SAMPLING.SLUG <- SAMPLING.SLUG[i,]
+  i.SAMPLING.SLUG <- rbind(i.SAMPLING.SLUG, i.SAMPLING.SLUG)
+  
+  i.SAMPLING.SLUG$SPECIES[1] <- "D. reticulatum"
+  i.SAMPLING.SLUG$SPECIES[2] <- "A. lusitanicus"
+
+  i.SAMPLING.SLUG$SLUG[1] <- i.SAMPLING.SLUG$DEROCERAS[1]
+  i.SAMPLING.SLUG$SLUG[2] <- i.SAMPLING.SLUG$ARION[1]
+  
+  SAMPLING <- rbind(SAMPLING, i.SAMPLING.SLUG)
+  
+}
+
+SAMPLING <- SAMPLING[-1,]
+SAMPLING <- SAMPLING[-1,]
+SAMPLING <- SAMPLING[-1,]
+
+# REMOVE USELESS VARIABLES
+#-------------------------
+
+SAMPLING$ARION <- NULL
+SAMPLING$DEROCERAS <- NULL
+SAMPLING$SNAIL <- NULL
+SAMPLING$HERBIVORE <- NULL
+
+rm(i.SAMPLING.SLUG, i, i.SP, i.STUDY_SITE.YEAR, SAMPLING.ls)
+rm(SAMPLING.ARION, SAMPLING.DEROCERAS, SAMPLING.HERB, SAMPLING.SLUG)
+rm(INTERACTIONS, INTERACTIONS.ALL)
+```
+
+# 04.1 - SLUGS TRANSECTS / MODELS
+
+```{r 04.1 NEW SLUGS TRANSECTS DATA FORMATING NEGATIVE BINOMIAL, fig.width = 10, warning = FALSE, message = FALSE}
+
+# 04.11 MODEL SELECTION
+#######################
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "AIC" = 9999,
+  "d.AIC" = 9999)
+
+# THREE COVARIABLES
+#------------------  
+
+# mod3.1
+mod3.1 <- glmer.nb(sqrt(SLUG) ~ LIGHT * DISTANCE * SPECIES + TEMP + AREA + (1|DISTANCE), data = SAMPLING)
+summary(mod3.1)
+
+Model <- "mod3.1"
+Variable <- "SLUG ~ LIGHT * DISTANCE * SPECIES + TEMP + AREA + (1 SAMPLING)"
+AIC <- AIC(mod3.1)  
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.1)
+
+# mod3.2
+mod3.2 <- glmer.nb(sqrt(SLUG) ~ LIGHT * DISTANCE + SPECIES + TEMP + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod3.2"
+Variable <- "SLUG ~ LIGHT * DISTANCE + SPECIES + TEMP + AREA + (1 SAMPLING)"
+AIC <- AIC(mod3.2)  
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.2)
+
+# mod3.3
+mod3.3 <- glmer.nb(sqrt(SLUG) ~ LIGHT + DISTANCE * SPECIES + TEMP + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod3.3"
+Variable <- "SLUG ~ LIGHT + DISTANCE * SPECIES + TEMP + AREA + (1 SAMPLING)"
+AIC <- AIC(mod3.3)  
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.3)  
+
+# mod3.4
+mod3.4 <- glmer.nb(sqrt(SLUG) ~ LIGHT + DISTANCE + SPECIES + TEMP + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod3.4"
+Variable <- "SLUG ~ LIGHT + DISTANCE + SPECIES + RAIN + AREA + (1 SAMPLING)"
+AIC <- AIC(mod3.4)  
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod3.4)  
+
+# TWO COVARIABLES
+#----------------
+
+# mod2.1
+mod2.1 <- glmer.nb(sqrt(SLUG) ~ LIGHT * DISTANCE + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod2.1"
+Variable <- "SLUG ~ LIGHT * DISTANCE + AREA + (1 SAMPLING)"
+AIC <- AIC(mod2.1)  
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1)
+
+# mod2.2
+mod2.2 <- glmer.nb(sqrt(SLUG) ~ LIGHT + DISTANCE + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod2.2"
+Variable <- "SLUG ~ LIGHT + DISTANCE + AREA + (1 SAMPLING)"
+AIC <- AIC(mod2.2)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.2)
+
+# ONE VARIABLE
+#-------------
+
+# mod1.1
+mod1.1 <- glmer.nb(sqrt(SLUG) ~ LIGHT + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod1.1"
+Variable <- "SLUG ~ LIGHT + AREA + (1 SAMPLING)"
+AIC <- AIC(mod1.1)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1)
+
+# mod1.2
+mod1.2 <- glmer.nb(sqrt(SLUG) ~ DISTANCE + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod1.2"
+Variable <- "SLUG ~ DISTANCE + AREA + (1 SAMPLING)"
+AIC <- AIC(mod1.2)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.2)
+
+# ZERO VARIABLE
+#--------------
+
+# mod0
+mod0 <- glmer.nb(sqrt(SLUG) ~ AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+Model <- "mod0"
+Variable <- "SLUG ~ AREA + (1 SAMPLING)"
+AIC <- AIC(mod0)
+dAIC <- NA
+
+list <- c(Model, Variable, AIC, dAIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod0)
+
+#-----------------------------------------------------------------------------------------------------------
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(j in (1:nrow(AIC.TABLE))){
+  
+  AIC.TABLE$d.AIC[j] <- round(AIC.TABLE$AIC[j] - AIC.min, 2)
+  
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+#-------------------------------------------------------------------------------------------------------------
+  
+# BEST MODEL
+#-----------
+
+# ADD SPECIES VARIABLES
+mod04.1 <- glmer.nb(sqrt(SLUG) ~ LIGHT * DISTANCE * SPECIES + TEMP + AREA + (1|PAIRS.SAMPLING), data = SAMPLING)
+
+res <- residuals(mod04.1)
+qqnorm(res)
+qqline(res)
+
+mod04.1.tbl <- tbl_regression(mod04.1, intercept = T) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**SLUG ~ LIGHT * DISTANCE * SPECIES + TEMP + AREA + (1|PAIRS.SAMPLING)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(mod04.1.tbl)
+# print(mod04.1.tbl)
+
+# REMOVE
+rm(mod04.1.tbl)
+rm(AIC.TABLE, AIC, AIC.min, dAIC, list, Model, Variable, j, res)
+
+##############################################################################################################
+
+# 04.12 PLOT EFFECT SIZE - ONLY CLOSE
+#####################################
+
+mod04.1 <- glmer.nb(sqrt(SLUG) ~ LIGHT * SPECIES + TEMP + AREA + (1|PAIRS.SAMPLING), data = SAMPLING[SAMPLING$DISTANCE == "CLOSE",])
+
+# POWER SIMULATION
+#-----------------
+
+nsim <- 10000
+
+SAMPLING$SPECIES <- as.factor(SAMPLING$SPECIES)
+n.level <- nlevels(SAMPLING$SPECIES)
+SPECIES.LS <- levels(SAMPLING$SPECIES)
+
+# SIMULATION
+bsim <- sim(mod04.1, n.sim = nsim)
+
+# CALCULATE EFFECT SIZE
+#----------------------
+
+# EMPTY MATRIX
+effmat <- matrix(ncol = nsim, nrow = n.level)
+effmat[1,] <- bsim@fixef[, "LIGHTLIGHT"]
+
+# FOR LOOP
+for(i in (2:n.level)){
+
+  # i <- 2
+  # print(i)
+
+  effmat[i,] <- bsim@fixef[, "LIGHTLIGHT"] +
+                bsim@fixef[, paste0("LIGHTLIGHT:SPECIES", levels(SAMPLING$SPECIES)[i])]
+}
+
+# CHECK COEFFICIENTS
+CI <- apply(effmat, 1, quantile, probs = c(0.025, 0.5, 0.975))
+CI <- cbind(c(0.025, 0.5, 0.975), CI)
+
+rm(mod04.1, bsim, effmat, i, nsim)
+
+# MERGE MATRIX
+#--------------
+colnames(CI) <- c("Level", c("A. lusitanicus", "D. reticulatum"))
+rownames(CI) <- NULL
+
+CI <- as.data.frame(CI)
+CI$Level <- as.numeric(CI$Level)
+
+CI <- CI[order(CI$Level),]
+
+# FORMAT CI
+#----------
+
+CI.coef <- data.frame(
+  "i.SPECIES" = 9999,
+  "i.2.5" = 9999,
+  "i.50" = 9999,
+  "i.97.5" = 9999,
+  "i.significant" = 9999)
+
+for(i in SPECIES.LS){ 
+  
+  i.CI.coef <- CI.coef[1,]
+  i.2.5 <- CI[1, i]
+  i.50 <- CI[2, i]
+  i.97.5 <- CI[3, i]
+  
+  i.SPECIES <- i
+  i.significant <- 0
+
+  i.CI.coef <- cbind(i.SPECIES, i.2.5, i.50, i.97.5, i.significant)
+  CI.coef <- rbind(CI.coef, i.CI.coef)
+
+}
+
+# REMOVE FIRST LINE FULL OF NA's
+CI.coef <- CI.coef[-1,]
+
+# FORMAT
+CI.coef$i.2.5 <- as.numeric(CI.coef$i.2.5)
+CI.coef$i.50 <- as.numeric(CI.coef$i.50)
+CI.coef$i.97.5 <- as.numeric(CI.coef$i.97.5)
+
+# SIGNIFICANT IF IT TOUCH THE LINE
+for(i in (1:nrow(CI.coef))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    {(CI.coef$i.97.5[i] < 0 & CI.coef$i.2.5[i] < 0) | 
+     (CI.coef$i.97.5[i] > 0 & CI.coef$i.2.5[i] > 0)},
+    
+    # IF YES
+    CI.coef$i.significant[i] <- 1,
+   
+    # IF NO
+    CI.coef$i.significant[i] <- 0)  
+}
+
+rm(CI, i.CI.coef)
+rm(i, i.2.5, i.50, i.97.5, i.SPECIES, n.level, i.significant)
+
+# SEGMENT PLOT
+#-------------
+
+g <- rasterGrob(matrix(c("grey90"), nrow = 1), width = unit(1,"npc"), height = unit(1,"npc"), interpolate = TRUE)
+
+# PLOT
+`04.12_SLUGS_CI_CLOSE` <- ggplot() +
+  
+  annotation_custom(g, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed") + 
+  geom_linerange(
+    data = CI.coef,
+    aes(
+      x = i.SPECIES,
+      ymin = i.2.5,
+      ymax = i.97.5),
+      linewidth = 4,
+      alpha = 0.5,
+      position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef,
+    aes(x = i.SPECIES,
+    y = i.50),
+    shape = 18,
+    size = 8,
+    position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.significant == "0",],
+    aes(
+      x = i.SPECIES,
+      y = i.50),
+      color = "white",
+      shape = 18,
+      size = 6,
+      position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_classic() +
+  labs(
+    y = "Estimate",
+    x = "Species",
+    title = "Close (< 5 m)") +
+  # scale_y_continuous(
+  #   limits = c(-2.5, 2.5)) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.line = element_blank(),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(size = 10),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 10))
+
+plot(`04.12_SLUGS_CI_CLOSE`)
+#--------------------------------------------------------------------------------------------------------------
+
+# 04.13 PLOT EFFECT SIZE - ONLY FAR
+#####################################
+
+mod04.1 <- glmer.nb(sqrt(SLUG) ~ LIGHT * SPECIES + TEMP + AREA + (1|PAIRS.SAMPLING), data = SAMPLING[SAMPLING$DISTANCE == "FAR",])
+
+# POWER SIMULATION
+#-----------------
+
+nsim <- 10000
+
+SAMPLING$SPECIES <- as.factor(SAMPLING$SPECIES)
+n.level <- nlevels(SAMPLING$SPECIES)
+SPECIES.LS <- levels(SAMPLING$SPECIES)
+
+# SIMULATION
+bsim <- sim(mod04.1, n.sim = nsim)
+
+# CALCULATE EFFECT SIZE
+#----------------------
+
+# EMPTY MATRIX
+effmat <- matrix(ncol = nsim, nrow = n.level)
+effmat[1,] <- bsim@fixef[, "LIGHTLIGHT"]
+
+# FOR LOOP
+for(i in (2:n.level)){
+
+  # i <- 2
+  # print(i)
+
+  effmat[i,] <- bsim@fixef[, "LIGHTLIGHT"] +
+                bsim@fixef[, paste0("LIGHTLIGHT:SPECIES", levels(SAMPLING$SPECIES)[i])]
+}
+
+# CHECK COEFFICIENTS
+CI <- apply(effmat, 1, quantile, probs = c(0.025, 0.5, 0.975))
+CI <- cbind(c(0.025, 0.5, 0.975), CI)
+
+rm(mod04.1, bsim, effmat, i, nsim)
+
+# MERGE MATRIX
+#--------------
+colnames(CI) <- c("Level", c("A. lusitanicus", "D. reticulatum"))
+rownames(CI) <- NULL
+
+CI <- as.data.frame(CI)
+CI$Level <- as.numeric(CI$Level)
+
+CI <- CI[order(CI$Level),]
+
+# FORMAT CI
+#----------
+
+CI.coef <- data.frame(
+  "i.SPECIES" = 9999,
+  "i.2.5" = 9999,
+  "i.50" = 9999,
+  "i.97.5" = 9999,
+  "i.significant" = 9999)
+
+for(i in SPECIES.LS){ 
+  
+  i.CI.coef <- CI.coef[1,]
+  i.2.5 <- CI[1, i]
+  i.50 <- CI[2, i]
+  i.97.5 <- CI[3, i]
+  
+  i.SPECIES <- i
+  i.significant <- 0
+
+  i.CI.coef <- cbind(i.SPECIES, i.2.5, i.50, i.97.5, i.significant)
+  CI.coef <- rbind(CI.coef, i.CI.coef)
+
+}
+
+# REMOVE FIRST LINE FULL OF NA's
+CI.coef <- CI.coef[-1,]
+
+# FORMAT
+CI.coef$i.2.5 <- as.numeric(CI.coef$i.2.5)
+CI.coef$i.50 <- as.numeric(CI.coef$i.50)
+CI.coef$i.97.5 <- as.numeric(CI.coef$i.97.5)
+
+# SIGNIFICANT IF IT TOUCH THE LINE
+for(i in (1:nrow(CI.coef))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    {(CI.coef$i.97.5[i] < 0 & CI.coef$i.2.5[i] < 0) | 
+     (CI.coef$i.97.5[i] > 0 & CI.coef$i.2.5[i] > 0)},
+    
+    # IF YES
+    CI.coef$i.significant[i] <- 1,
+   
+    # IF NO
+    CI.coef$i.significant[i] <- 0)  
+}
+
+rm(CI, i.CI.coef)
+rm(i, i.2.5, i.50, i.97.5, i.SPECIES, n.level, i.significant)
+
+# SEGMENT PLOT
+#-------------
+g <- rasterGrob(matrix(c("grey40"), nrow = 1), width = unit(1,"npc"), height = unit(1,"npc"), interpolate = TRUE)
+
+# PLOT
+`04.13_SLUGS_CI_FAR` <- ggplot() +
+  
+  annotation_custom(g, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed") + 
+  geom_linerange(
+    data = CI.coef,
+    aes(
+      x = i.SPECIES,
+      ymin = i.2.5,
+      ymax = i.97.5),
+      linewidth = 4,
+      alpha = 0.5,
+      position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef,
+    aes(x = i.SPECIES,
+    y = i.50),
+    shape = 18,
+    size = 8,
+    position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.significant == "0",],
+    aes(
+      x = i.SPECIES,
+      y = i.50),
+      color = "white",
+      shape = 18,
+      size = 6,
+      position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_classic() +
+  labs(
+    y = "Estimate",
+    x = "SPECIES",
+    title = "Far (> 5 m)") +
+  # scale_y_continuous(
+  #   limits = c(-1.5, 1.5)) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.line = element_blank(),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(size = 10),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank())
+
+#--------------------------------------------------------------------------------------------------------------
+
+# FINAL PLOT
+#-----------
+
+`04.1_SLUGS_CI` <- grid.arrange(`04.12_SLUGS_CI_CLOSE`, 
+                                `04.13_SLUGS_CI_FAR`, nrow = 1, widths = c(1.2, 1))
+
+# FINAL REMOVE
+##############
+rm(SAMPLING, CI.coef, SPECIES.LS)
+rm(`04.1_SLUGS_CI`, `04.12_SLUGS_CI_CLOSE`, `04.13_SLUGS_CI_FAR`, g)
+
+```
+
+# 05.0 - HERBIVORY IN SITU / DATA FORMATING & EXPLORATORY PLOTS
+
+```{r 05.0 HERBIVORY IN SITU DATA FORMATING AND EXPLORATORY PLOTS, fig.width = 10, warning = FALSE, message = FALSE}
+
+# FORMAT
+########
+
+# TRANSFORM % INTO NUMERIC
+#-------------------------
+
+col.names <- c("M_LEA_DAM0", "M_LEA_DAM1", "M_LEA_DAM2", "M_LEA_DAM3", "M_LEA_DAM4",
+             "M_LEA_DAM5", "M_LEA_DAM6", "M_LEA_DAM7", "M_LEA_DAM8", "M_LEA_DAM9",
+             "M_FLO_DAM1", "M_FLO_DAM2", "M_FLO_DAM3", "M_FLO_DAM4", "M_FLO_DAM5")
+
+for(i in col.names){
+  
+  # i <- "B_LEA_DAM6"
+  
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "1%", "0.01")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "10%", "0.1")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "15%", "0.15")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "20%", "0.2")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "25%", "0.25")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "30%", "0.3")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "40%", "0.4")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "50%", "0.5")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "60%", "0.6")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "70%", "0.7")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "80%", "0.8")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "90%", "0.9")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "100%", "1")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "0%", "0")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "5%", "0.05")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], "NOT MEAS", "NA")
+  TRAITS[,i] <- str_replace_all(TRAITS[,i], " ", "NA")
+
+  TRAITS[,i] <- as.numeric(TRAITS[,i])
+
+}
+
+rm(col.names)
+
+# ADD LIGHT TREATMENT
+#--------------------
+
+TRAITS$S_LIGHT_TRMT <- NA
+
+for(i in (1:nrow(TRAITS))){
+  
+  i.S_STU.SI <- TRAITS$S_STU.SI[i]
+  ifelse(
+    
+    # STATEMENT
+    i.S_STU.SI %in% LIT.SITE,
+    
+    # IF YES
+    TRAITS$S_LIGHT_TRMT[i] <- "LIT",
+    
+    # IF NO
+    TRAITS$S_LIGHT_TRMT[i] <- "DARK")}
+
+rm(i.S_STU.SI, i)
+#-------------------------------------------------------------------------------------------------------------
+
+# CALCULATE SEVERITY, PROPORTION & ABSOLUTE NUMBER OF EATEN LEAVE FOR EACH POT
+##############################################################################
+
+# CREATE EMPTY VARIABLES
+TRAITS$LEA.PROP <- NA
+TRAITS$LEA.SEVER <- NA
+TRAITS$LEA.ABS <- NA
+TRAITS$LEA.PRESENT <- NA
+
+TRAITS$FLO.PROP <- NA
+TRAITS$FLO.SEVER <- NA
+TRAITS$FLO.ABS <- NA
+TRAITS$FLO.PRESENT <- NA
+
+THRESHOLD <- 0
+
+# FOR LOOP
+for(i in (1:nrow(TRAITS))){
+  
+  # i <- 368
+  # print(TRAITS$P_PL_LABEL[i])
+  
+  i.TRAITS <- TRAITS[i,]
+  
+  # LEAVE DAMAGES PROPORTION
+  #-------------------------
+  zero.ls <- c(i.TRAITS$M_LEA_DAM0, i.TRAITS$M_LEA_DAM1, i.TRAITS$M_LEA_DAM2, i.TRAITS$M_LEA_DAM3, i.TRAITS$M_LEA_DAM4,
+               i.TRAITS$M_LEA_DAM5, i.TRAITS$M_LEA_DAM6, i.TRAITS$M_LEA_DAM7, i.TRAITS$M_LEA_DAM8, i.TRAITS$M_LEA_DAM9)
+  
+  zero.ls.n <- length(zero.ls[!is.na(zero.ls)])
+  TRAITS$LEA.PRESENT[i] <- 10 - length(zero.ls[is.na(zero.ls)])
+
+  TRAITS$LEA.PROP[i] <- 1 - ((length(zero.ls[zero.ls <= THRESHOLD & !is.na(zero.ls)])) / zero.ls.n)
+  
+  # HERBIVORY ABSOLUTE
+  #-------------------
+  damaged.ls.n <- length(zero.ls[which(zero.ls > THRESHOLD)])
+  TRAITS$LEA.ABS[i] <- damaged.ls.n
+
+  # LEAVE SEVERITY
+  #---------------
+  ifelse(
+    
+    # ARGUMENT
+    mean(zero.ls, na.rm = T) == 0,
+    
+    # IF YES
+    TRAITS$LEA.SEVER[i] <- 0,
+    
+    # IF NO
+    TRAITS$LEA.SEVER[i] <- mean(zero.ls[which(zero.ls >= THRESHOLD)], na.rm = T)
+    )
+    
+  # FLORIVORY PROPORTION
+  #---------------------
+  zero.ls <- c(i.TRAITS$M_FLO_DAM1, i.TRAITS$M_FLO_DAM2, i.TRAITS$M_FLO_DAM3, i.TRAITS$M_FLO_DAM4, i.TRAITS$M_FLO_DAM5)
+  zero.ls.n <- length(zero.ls[!is.na(zero.ls)])
+  TRAITS$FLO.PRESENT[i] <- 5 - length(zero.ls[is.na(zero.ls)])
+  
+  TRAITS$FLO.PROP[i] <- round(1 - (length(which(zero.ls == 0))) / zero.ls.n, 3)
+
+  # FLORIVORY ABSOLUTE
+  #-------------------
+  damaged.ls.n <- length(zero.ls[which(zero.ls > 0)])
+  TRAITS$FLO.ABS[i] <- damaged.ls.n
+  
+  # FLORIVORY SEVERITY
+  #-------------------
+  ifelse(
+    
+    # ARGUMENT
+    mean(zero.ls, na.rm = T) == 0,
+    
+    # IF YES
+    TRAITS$FLO.SEVER[i] <- 0,
+    
+    # IF NO
+    TRAITS$FLO.SEVER[i] <- mean(zero.ls[zero.ls != 0], na.rm = T))
+
+}
+
+TRAITS$LEA.SEVER <- as.numeric(round(TRAITS$LEA.SEVER, 2))
+TRAITS$LEA.PROP <- as.numeric(TRAITS$LEA.PROP)
+TRAITS$FLO.SEVER <- as.numeric(round(TRAITS$FLO.SEVER, 2))
+TRAITS$FLO.PROP <- as.numeric(TRAITS$FLO.PROP)
+
+rm(i.TRAITS, damaged.ls.n, i, zero.ls, zero.ls.n, THRESHOLD)
+
+#-------------------------------------------------------------------------------------------------------------
+
+DAMAGE <- data.frame(
+    
+    SPECIES = NA,
+    LABEL = NA,
+    DATE = NA,
+    STU.SI = NA,
+    TREA_LIGHT = NA,
+    LUX = NA,
+    LAMP_DIST = NA,
+    TYPE = NA,
+    DAMAGES = NA)
+
+# FOR LOOP
+#----------
+for(i in (1:nrow(TRAITS))){
+  
+  # i <- 45
+  # print(i)
+  
+  i.TRAITS <- TRAITS[i,]
+  i.LABEL <- i.TRAITS$P_PL_LABEL
+  i.LABEL.short <- as.numeric(str_sub(i.LABEL, start = -4))
+
+  # EMPTY DATA FRAME WITH 10 ROWS
+  i.DAMAGE <- DAMAGE[1,]
+  i.DAMAGE <- rbind(i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE,
+                    i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE, i.DAMAGE)
+
+  # FILL SAMPLING INFOS
+  #--------------------
+  i.DAMAGE$SPECIES <- i.TRAITS$P_PLANT_SP
+  i.DAMAGE$LABEL <- i.LABEL
+  i.DAMAGE$DATE <- i.TRAITS$S_DATE
+  i.DAMAGE$STU.SI <- i.TRAITS$S_STU.SI 
+  i.DAMAGE$TREA_LIGHT <- i.TRAITS$S_LIGHT_TRMT
+  i.DAMAGE$LUX <- i.TRAITS$LUX
+  i.DAMAGE$LAMP_DIST <- i.TRAITS$LAMP_DIST
+
+  
+  # FILL DAMAGES
+  #-------------
+  i.DAMAGES <- c(i.TRAITS$M_LEA_DAM0, i.TRAITS$M_LEA_DAM1, i.TRAITS$M_LEA_DAM2, i.TRAITS$M_LEA_DAM3, i.TRAITS$M_LEA_DAM4,
+                 i.TRAITS$M_LEA_DAM5, i.TRAITS$M_LEA_DAM6, i.TRAITS$M_LEA_DAM7, i.TRAITS$M_LEA_DAM8, i.TRAITS$M_LEA_DAM9, 
+                 i.TRAITS$M_FLO_DAM1, i.TRAITS$M_FLO_DAM2, i.TRAITS$M_FLO_DAM3, i.TRAITS$M_FLO_DAM4, i.TRAITS$M_FLO_DAM5)
+  
+  i.DAMAGE$TYPE <- c(rep("LEAVE", 10), rep("FLOWER", 5))
+  i.DAMAGE$DAMAGES <- i.DAMAGES
+  
+  # MERGE
+  DAMAGE <- rbind(DAMAGE, i.DAMAGE)
+  
+}
+
+rm(i.DAMAGE, i.DAMAGES, i.TRAITS)
+rm(i, i.LABEL, i.LABEL.short)
+
+# CLEAN
+#------
+
+# Remove first line full of NA's 
+DAMAGE <- DAMAGE[-1,] # 8160
+
+# Remove NA's
+DAMAGE <- DAMAGE[!is.na(DAMAGE$DAMAGES),] # 6192
+
+##############################################################################################################¨
+
+# VISUALIZE DATA
+################
+
+# COLOR PALETTE
+#--------------
+# COLOR PALETTE
+COLOR.PALETTE <- c(wes_palettes$Cavalcanti1[5], # Centaurea jacea
+                   wes_palettes$Darjeeling1[3], # Leucanthemum Vulgare
+                   wes_palettes$IsleofDogs1[1]) # Malva moschata
+                   
+# LIGHT TREATMENT
+#----------------
+`05.0_LIGHT_TREATMENT.barplot` <- ggplot(
+    data = TRAITS,
+    aes(
+      x = P_PLANT_SP,
+      fill = P_PLANT_SP,
+      pattern = S_LIGHT_TRMT),
+    color = "blank") +
+  geom_histogram_pattern(
+    stat = "count",
+    position = position_dodge(preserve = "single"),
+    color = "white",
+    pattern_fill = "white",
+    pattern_angle = 45,
+    pattern_density = 0.25,
+    pattern_color = NA,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  scale_pattern_manual(
+    values = c(
+    LIT   = "stripe", DARK  = "none")) +
+  scale_fill_manual(
+    values = COLOR.PALETTE) +
+  theme_classic() +
+  labs(
+    x = "Plant species",
+    y = "Measured individuals",
+    title = "Number of individuals",
+    pattern = "Light Treatment") +
+  guides(
+    fill = "none",
+    pattern = guide_legend(ncol = 2, byrow = TRUE)) +
+  theme(
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    legend.position = c(0.8, 0.9),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 12),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`05.0_LIGHT_TREATMENT.barplot`)
+
+# SAVE
+#-----
+# ggsave(filename = "05.0_LIGHT_TREATMENT.barplot.jpeg",
+#          plot = `05.0_LIGHT_TREATMENT.barplot`, path = HOME,
+#          height = 16, width = 20, units = "cm")
+
+rm(`05.0_LIGHT_TREATMENT.barplot`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# SAVE
+#-----
+
+DATADIR <- "C:/Users/vgrog/OneDrive/00_AGROSCOPE - ALAN PROJECT/06_ANALYSIS/2023/01_ALAN x HERBIVORY/OUTPUT/"
+write.csv(DAMAGE, paste0(DATADIR, "DAMAGE.csv"))
+rm(DATADIR)
+
+```
+
+# 05.1 - HERBIVORY IN SITU / HERBIVORY
+
+```{r 05.1 HERBIVORY IN SITU HERBIVORY, fig.width = 10, warning = FALSE, message = FALSE}
+
+# 05.11 NUMBER OF EATEN LEAVES
+##############################
+
+COLOR.PALETTE <- c(wes_palettes$Cavalcanti1[5], # Centaurea jacea
+                   wes_palettes$Darjeeling1[3], # Leucanthemum Vulgare
+                   wes_palettes$IsleofDogs1[1]) # Malva moschata
+
+# SUBSET
+SUBSET <- TRAITS
+
+# PLOT
+`05.11_PROP_LEA` <- ggplot(data = SUBSET, 
+    aes(
+      x = LEA.ABS,
+      y = P_PLANT_SP,
+      fill = P_PLANT_SP,
+      pattern = S_LIGHT_TRMT)) +
+  geom_boxplot_pattern(color = "black",
+    pattern_fill = "white",
+    pattern_angle = 45,
+    pattern_density = 0.5,
+    pattern_color = NA,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  geom_jitter(alpha = 0.15) +
+  scale_pattern_manual(
+    values = c("LIT" = "stripe", "DARK"  = "none"),
+    name = "Light treatment",
+    labels = c("Dark", "Light")) +                              
+  scale_fill_manual(values = COLOR.PALETTE) +
+  theme_minimal() +
+  guides(fill = "none") +
+  labs(
+    title = "Number of damaged leaves within the 10 lowest",
+    x = "Eaten leaves",
+    y = "Species") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`05.11_PROP_LEA`)
+
+# SAVE
+# ggsave(filename = "05.11_PROP_LEA.jpeg",
+#          plot = `05.11_PROP_LEA`, path = HOME,
+#          height = 16, width = 20, units = "cm")
+
+rm(`05.11_PROP_LEA`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MODEL SELECTION
+#----------------
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "anova.p" = 9999,
+  "anova.dAIC" = 9999,
+  "AIC" = 9999,
+  "BIC" = 9999)
+
+# mod2.1 - with interactions
+mod2.1.light <- glmer(cbind(LEA.ABS, LEA.PRESENT - LEA.ABS) ~ S_LIGHT_TRMT * P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+mod2.1 <- glmer(cbind(LEA.ABS, LEA.PRESENT - LEA.ABS) ~ P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+
+Model <- "mod2.1"
+Variable <- "S_LIGHT_TRMT * P_PLANT_SP"
+
+anova <- anova(mod2.1, mod2.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1, mod2.1.light)
+
+# mod2.2 - without interactions
+mod2.2.light <- glmer(cbind(LEA.ABS, LEA.PRESENT - LEA.ABS) ~ S_LIGHT_TRMT + P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+mod2.2 <- glmer(cbind(LEA.ABS, LEA.PRESENT - LEA.ABS) ~ P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+
+Model <- "mod2.2"
+Variable <- "S_LIGHT_TRMT + P_PLANT_SP"
+
+anova <- anova(mod2.2, mod2.2.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.2, mod2.2.light)
+
+# mod1.1 - without species
+mod1.1.light <- glmer(cbind(LEA.ABS, LEA.PRESENT - LEA.ABS) ~ S_LIGHT_TRMT + (1|S_STU.SI), data = SUBSET, family = binomial)
+mod1.1 <- glmer(cbind(LEA.ABS, LEA.PRESENT - LEA.ABS) ~ 1 + (1|S_STU.SI), data = SUBSET, family = binomial)
+
+Model <- "mod1.1"
+Variable <- "S_LIGHT_TRMT"
+
+anova <- anova(mod1.1, mod1.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1, mod1.1.light)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+AIC.TABLE$d.AIC <- NA
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(i in (1:nrow(AIC.TABLE))){
+  
+  AIC.TABLE$d.AIC[i] <- round(AIC.TABLE$AIC[i] - AIC.min, 2)
+  
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+# REMOVE
+rm(AIC.TABLE, AIC, AIC.min, i, list, Model, Variable, anova.dAIC, anova.p, BIC, anova)
+#-------------------------------------------------------------------------------------------------------------
+
+# BEST MODEL
+#-----------
+mod05.11 <- glmer(cbind(LEA.ABS, LEA.PRESENT - LEA.ABS) ~ S_LIGHT_TRMT * P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+qqnorm(residuals(mod05.11))
+qqline(residuals(mod05.11))
+
+mod05.11.tbl <- tbl_regression(mod05.11, 
+                              intercept = T,
+                              pvalue_fun = ~ style_pvalue(.x, digits = 3),
+                              estimate_fun = ~ style_number(.x, digits = 3)) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**cbind(Eaten leaves, 10 - Eaten leaves) ~ Light * Plant Sp. + (1|Study site)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(mod05.11.tbl)
+# print(mod05.11.tbl)
+
+# SAVE
+# gtsave(as_gt(mod05.11.tbl),
+#        file = file.path(paste0(HOME,"/mod05.11.tbl.png")))
+
+# REMOVE
+rm(mod05.11.tbl)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# POWER SIMULATION
+#-----------------
+
+nsim <- 10000
+
+SUBSET$P_PLANT_SP <- as.factor(SUBSET$P_PLANT_SP)
+n.level <- nlevels(SUBSET$P_PLANT_SP)
+PLANT.LS <- levels(SUBSET$P_PLANT_SP)
+
+# SIMULATION
+bsim <- sim(mod05.11, n.sim = nsim)
+
+# CALCULATE EFFECT SIZE
+#----------------------
+
+# EMPTY MATRIX
+effmat <- matrix(ncol = nsim, nrow = n.level)
+effmat[1,] <- bsim@fixef[, "S_LIGHT_TRMTLIT"]
+
+# FOR LOOP
+for(i in (2:n.level)){
+
+  # i <- 2
+  # print(i)
+
+  effmat[i,] <- bsim@fixef[, "S_LIGHT_TRMTLIT"] +
+                bsim@fixef[, paste0("S_LIGHT_TRMTLIT:P_PLANT_SP", levels(SUBSET$P_PLANT_SP)[i])]
+}
+
+# CHECK COEFFICIENTS
+CI.HERB.ABS <- apply(effmat, 1, quantile, probs = c(0.05, 0.5, 0.95))
+CI.HERB.ABS <- cbind(rep("HERB.ABS", 3), CI.HERB.ABS)
+CI.HERB.ABS <- cbind(c(0.05, 0.5, 0.95), CI.HERB.ABS)
+
+kable(CI.HERB.ABS)
+
+rm(mod05.11, bsim, effmat, i, nsim)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MERGE MATRIX
+#--------------
+CI <- CI.HERB.ABS
+colnames(CI) <- c("Level", "DAMAGES", PLANT.LS)
+rownames(CI) <- NULL
+
+CI <- as.data.frame(CI)
+CI$Level <- as.numeric(CI$Level)
+
+CI <- CI[order(CI$Level),]
+
+# FORMAT CI
+#----------
+
+CI.coef <- data.frame(
+  "i.damages" = 9999,
+  "i.species" = 9999,
+  "i.2.5" = 9999,
+  "i.50" = 9999,
+  "i.97.5" = 9999,
+  "i.significant" = 9999)
+
+for(i in PLANT.LS){ 
+  
+  # i <- "Malva moschata"
+  
+  i.CI.coef <- CI.coef[1,]
+  i.2.5 <- CI[1, i]
+  i.50 <- CI[2, i]
+  i.97.5 <- CI[3, i]
+  
+  i.species <- i
+  i.damages <- unique(CI$DAMAGES)
+  
+  i.significant <- 0
+
+  i.CI.coef <- cbind(i.species, i.damages, i.2.5, i.50, i.97.5, i.significant)
+  CI.coef <- rbind(CI.coef, i.CI.coef)
+
+}
+
+# REMOVE FIRST LINE FULL OF NA's
+CI.coef <- CI.coef[-1,]
+
+# FORMAT
+CI.coef$i.2.5 <- as.numeric(CI.coef$i.2.5)
+CI.coef$i.50 <- as.numeric(CI.coef$i.50)
+CI.coef$i.97.5 <- as.numeric(CI.coef$i.97.5)
+
+# SIGNIFICANT IF IT TOUCH THE LINE
+for(i in (1:nrow(CI.coef))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    {(CI.coef$i.97.5[i] < 0 & CI.coef$i.2.5[i] < 0) | 
+     (CI.coef$i.97.5[i] > 0 & CI.coef$i.2.5[i] > 0)},
+    
+    # IF YES
+    CI.coef$i.significant[i] <- 1,
+   
+    # IF NO
+    CI.coef$i.significant[i] <- 0)  
+}
+
+rm(CI, CI.HERB.ABS, i.CI.coef)
+rm(i, i.2.5, i.50, i.97.5, i.damages, i.significant, i.species, PLANT.LS, n.level)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# SEGMENT PLOT
+#-------------
+
+`05.11_CI.HERB.ABS` <- ggplot() +
+
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed") + 
+  geom_linerange(
+    data = CI.coef[CI.coef$i.damages == "HERB.ABS",],
+    aes(
+      x = i.species,
+      ymin = i.2.5,
+      ymax = i.97.5,
+      color = i.species),
+      linewidth = 4,
+      alpha = 0.5,
+      position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "HERB.ABS",],
+    aes(x = i.species,
+    y = i.50,
+    color = i.species),
+    shape = 18,
+    size = 8,
+    position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "HERB.ABS" & CI.coef$i.significant == "0",],
+    aes(
+      x = i.species,
+      y = i.50),
+      color = "white",
+      shape = 18,
+      size = 6,
+      position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_classic() +
+  labs(
+    y = "Estimate",
+    x = "Species",
+    title = "Number of eaten leaves") +
+  scale_colour_manual(
+    values = COLOR.PALETTE) +
+  scale_y_continuous(
+    limits = c(-1.5, 1.5)) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    axis.title.y = element_blank(),
+    axis.line = element_blank(),
+    axis.text.y = element_text(size = 8),
+    axis.title.x = element_text(hjust = 0.5, size = 8, face = "bold"),
+    axis.text.x = element_text(size = 8))
+
+# plot(`05.11_CI.HERB.ABS`)
+
+# SAVE
+# ggsave(filename = paste0("05.11_CI.HERB.ABS.jpeg"),
+#          plot = `05.11_CI.HERB.ABS`, path = HOME,
+#          height = 8, width = 16, units = "cm")
+
+rm(CI.coef)
+
+##############################################################################################################
+
+# 05.12 SEVERITY OF EATEN LEAVES
+################################
+
+# SUBSET
+#-------
+THRESHOLD <- 0
+
+SUBSET <- DAMAGE # 6192
+SUBSET <- SUBSET[SUBSET$DAMAGES > THRESHOLD ,] # 3533
+SUBSET <- SUBSET[SUBSET$TYPE == "LEAVE" ,] # 3049
+
+# PLOT
+#-----
+`05.12_SEV_LEA` <- ggplot(data = SUBSET, 
+    aes(
+      x = DAMAGES,
+      y = SPECIES,
+      fill = SPECIES,
+      pattern = TREA_LIGHT)) +
+  geom_boxplot_pattern(color = "black",
+    pattern_fill = "white",
+    pattern_angle = 45,
+    pattern_density = 0.5,
+    pattern_color = NA,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  geom_jitter(alpha = 0.05) +
+  scale_pattern_manual(
+    values = c("LIT" = "stripe", "DARK"  = "none"),
+    name = "Light treatment",
+    labels = c("Dark", "Light")) +  
+  scale_fill_manual(
+    values = COLOR.PALETTE) +
+  theme_minimal() +
+  guides(
+    fill = "none") +
+  labs(
+    title = "Severity of damaged leaves",
+    x = "Severity of damaged leaves [%]",
+    y = "Species") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`05.12_SEV_LEA`)
+
+# SAVE
+# ggsave(filename = "05.12_SEV_LEA.jpeg",
+#          plot = `05.12_SEV_LEA`, path = HOME,
+#          height = 16, width = 20, units = "cm")
+
+rm(`05.12_SEV_LEA`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MODEL SELECTION
+#----------------
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "anova.p" = 9999,
+  "anova.dAIC" = 9999,
+  "AIC" = 9999,
+  "BIC" = 9999)
+
+# mod2.1 - with interactions
+mod2.1.light <- lmer(DAMAGES ~ TREA_LIGHT * SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+mod2.1 <- lmer(DAMAGES ~ SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+
+Model <- "mod2.1"
+Variable <- "TREA_LIGHT * SPECIES"
+
+anova <- anova(mod2.1, mod2.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1, mod2.1.light)
+
+# mod2.2 - without interactions
+mod2.2.light <- lmer(DAMAGES ~ TREA_LIGHT + SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+mod2.2 <- lmer(DAMAGES ~ SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+
+Model <- "mod2.2"
+Variable <- "TREA_LIGHT + SPECIES"
+
+anova <- anova(mod2.2, mod2.2.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.2, mod2.2.light)
+
+# mod1.1 - without species
+mod1.1.light <- lmer(DAMAGES ~ TREA_LIGHT + (1|STU.SI) + (1|LABEL), data = SUBSET)
+mod1.1 <- lmer(DAMAGES ~ 1 + (1|STU.SI) + (1|LABEL), data = SUBSET)
+
+Model <- "mod1.1"
+Variable <- "TREA_LIGHT"
+
+anova <- anova(mod1.1, mod1.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1, mod1.1.light)
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+AIC.TABLE$d.AIC <- NA
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(i in (1:nrow(AIC.TABLE))){
+
+  AIC.TABLE$d.AIC[i] <- round(AIC.TABLE$AIC[i] - AIC.min, 2)
+
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+# REMOVE
+rm(AIC.TABLE, AIC, AIC.min, i, list, Model, Variable, anova.dAIC, anova.p, BIC, anova)
+#-------------------------------------------------------------------------------------------------------------
+
+# BEST MODEL
+#-----------
+mod05.12 <- lmer(sqrt(DAMAGES) ~ TREA_LIGHT * SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+qqnorm(residuals(mod05.12))
+qqline(residuals(mod05.12))
+
+mod05.12.tbl <- tbl_regression(mod05.12, 
+                              intercept = T,
+                              pvalue_fun = ~ style_pvalue(.x, digits = 3),
+                              estimate_fun = ~ style_number(.x, digits = 3)) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**Leaves damages severity ~ Light * Plant Sp. + (1|Study site) + (1|Label)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+# PRINT
+knit_print(mod05.12.tbl)
+# print(mod05.12.tbl)
+
+# SAVE
+# gtsave(as_gt(mod05.12.tbl),
+#        file = file.path(paste0(HOME,"/mod05.12.tbl.png")))
+
+# REMOVE
+rm(mod05.12.tbl)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# POWER SIMULATION
+#-----------------
+
+nsim <- 10000
+
+SUBSET$SPECIES <- as.factor(SUBSET$SPECIES)
+n.level <- nlevels(SUBSET$SPECIES)
+PLANT.LS <- levels(SUBSET$SPECIES)
+
+# SIMULATION
+bsim <- sim(mod05.12, n.sim = nsim)
+
+# CALCULATE EFFECT SIZE
+#----------------------
+
+# EMPTY MATRIX
+effmat <- matrix(ncol = nsim, nrow = n.level)
+effmat[1,] <- bsim@fixef[, "TREA_LIGHTLIT"]
+
+# FOR LOOP
+for(i in (2:n.level)){
+
+  # i <- 2
+
+  effmat[i,] <- bsim@fixef[, "TREA_LIGHTLIT"] +
+                bsim@fixef[, paste0("TREA_LIGHTLIT:SPECIES", levels(SUBSET$SPECIES)[i])]
+}
+
+# CHECK COEFFICIENTS
+CI.HERB.SEV <- apply(effmat, 1, quantile, probs = c(0.05, 0.5, 0.95))
+CI.HERB.SEV <- cbind(rep("HERB.SEV", 3), CI.HERB.SEV)
+CI.HERB.SEV <- cbind(c(0.05, 0.5, 0.95), CI.HERB.SEV)
+
+kable(CI.HERB.SEV)
+
+rm(mod05.12, bsim, effmat, i, nsim)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MERGE MATRIX
+#--------------
+CI <- CI.HERB.SEV
+colnames(CI) <- c("Level", "DAMAGES", PLANT.LS)
+rownames(CI) <- NULL
+
+CI <- as.data.frame(CI)
+CI$Level <- as.numeric(CI$Level)
+
+CI <- CI[order(CI$Level),]
+
+# FORMAT CI
+#----------
+
+CI.coef <- data.frame(
+  "i.damages" = 9999,
+  "i.species" = 9999,
+  "i.2.5" = 9999,
+  "i.50" = 9999,
+  "i.97.5" = 9999,
+  "i.significant" = 9999)
+
+for(i in PLANT.LS){ 
+  
+  # i <- "Malva moschata"
+  
+  i.CI.coef <- CI.coef[1,]
+  i.2.5 <- CI[1, i]
+  i.50 <- CI[2, i]
+  i.97.5 <- CI[3, i]
+  
+  i.species <- i
+  i.damages <- unique(CI$DAMAGES)
+  
+  i.significant <- 0
+
+  i.CI.coef <- cbind(i.species, i.damages, i.2.5, i.50, i.97.5, i.significant)
+  CI.coef <- rbind(CI.coef, i.CI.coef)
+
+}
+
+# REMOVE FIRST LINE FULL OF NA's
+CI.coef <- CI.coef[-1,]
+
+# FORMAT
+CI.coef$i.2.5 <- as.numeric(CI.coef$i.2.5)
+CI.coef$i.50 <- as.numeric(CI.coef$i.50)
+CI.coef$i.97.5 <- as.numeric(CI.coef$i.97.5)
+
+# SIGNIFICANT IF IT TOUCH THE LINE
+for(i in (1:nrow(CI.coef))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    {(CI.coef$i.97.5[i] < 0 & CI.coef$i.2.5[i] < 0) | 
+     (CI.coef$i.97.5[i] > 0 & CI.coef$i.2.5[i] > 0)},
+    
+    # IF YES
+    CI.coef$i.significant[i] <- 1,
+   
+    # IF NO
+    CI.coef$i.significant[i] <- 0)  
+}
+
+rm(CI, CI.HERB.SEV, i.CI.coef)
+rm(i, i.2.5, i.50, i.97.5, i.damages, i.significant, i.species, PLANT.LS, n.level)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# SEGMENT PLOT
+#-------------
+
+`05.12_CI.HERB.SEV` <- ggplot() +
+
+  geom_hline(
+    yintercept = 0, 
+    linetype = "dashed") + 
+  geom_linerange(
+    data = CI.coef[CI.coef$i.damages == "HERB.SEV",],
+    aes(
+      x = i.species,
+      ymin = i.2.5,
+      ymax = i.97.5,
+      color = i.species),
+    size = 4,
+    alpha = 0.5,
+    position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "HERB.SEV",],
+    aes(
+      x = i.species,
+      y = i.50,
+      color = i.species),
+      shape = 18,
+      size = 8,
+      position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "HERB.SEV" & CI.coef$i.significant == "0",],
+    aes(
+      x = i.species,
+      y = i.50),
+    color = "white",
+    shape = 18,
+    size = 6,
+    position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_classic() +
+  labs(
+    y = "Estimate",
+    x = "Species",
+    title = "Severity of eaten leaves") +
+  scale_colour_manual(values = COLOR.PALETTE) +
+  scale_y_continuous(limits = c(-0.2, 0.2)) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.line = element_blank(),
+    # axis.text.y = element_text(size = 8, angle = 0, hjust = 0.5, face = "italic"),
+    axis.title.x = element_text(hjust = 0.5, size = 8, face = "bold"),
+    axis.text.x = element_text(size = 8))
+
+# plot(`05.12_CI.HERB.SEV`)
+
+# SAVE
+# ggsave(filename = paste0("05.12_CI.HERB.SEV.jpeg"),
+#          plot = `05.12_CI.HERB.SEV`, path = HOME,
+#          height = 8, width = 16, units = "cm")
+
+rm(CI.coef, THRESHOLD)
+
+```
+
+# 05.2 - HERBIVORY IN SITU / FLORIVORY
+
+```{r 05.2 HERBIVORY IN SITU FLORIVORY, fig.width = 10, warning = FALSE, message = FALSE}
+
+# 05.21 ABSOLUTE NUMBER OF EATEN FLOWERS
+########################################
+
+# SUBSET
+SUBSET <- TRAITS
+
+# PLOT
+`05.21_ABS_FLO` <- ggplot(data = SUBSET, 
+    aes(
+      x = FLO.ABS,
+      y = P_PLANT_SP,
+      fill = P_PLANT_SP,
+      pattern = S_LIGHT_TRMT)) +
+  geom_boxplot_pattern(
+    color = "black",
+    pattern_fill = "white",
+    pattern_angle = 45,
+    pattern_density = 0.5,
+    pattern_color = NA,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  geom_jitter(
+    alpha = 0.15) +
+  scale_pattern_manual(
+    values = c("LIT" = "stripe", "DARK"  = "none"),
+    name = "Light treatment",
+    labels = c("Dark", "Light")) +    scale_fill_manual(values = COLOR.PALETTE) +
+  theme_minimal() +
+  guides(fill = "none") +
+  labs(
+    title = "Number of damaged flowers",
+    x = "Eaten flowers",
+    y = "Species") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`05.21_ABS_FLO`)
+
+# # SAVE
+# ggsave(filename = "05.21_ABS_FLO.jpeg",
+#          plot = `05.21_ABS_FLO`, path = HOME,
+#          height = 16, width = 20, units = "cm")
+
+rm(`05.21_ABS_FLO`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MODEL SELECTION
+#----------------
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "anova.p" = 9999,
+  "anova.dAIC" = 9999,
+  "AIC" = 9999,
+  "BIC" = 9999)
+
+# mod2.1 - with interactions
+mod2.1.light <- glmer(cbind(FLO.ABS, FLO.PRESENT - FLO.ABS) ~ S_LIGHT_TRMT * P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+mod2.1 <- glmer(cbind(FLO.ABS, FLO.PRESENT - FLO.ABS) ~ P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+
+Model <- "mod2.1"
+Variable <- "S_LIGHT_TRMT * P_PLANT_SP"
+
+anova <- anova(mod2.1, mod2.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1, mod2.1.light)
+
+# mod2.2 - without interactions
+mod2.2.light <- glmer(cbind(FLO.ABS, FLO.PRESENT - FLO.ABS) ~ S_LIGHT_TRMT + P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+mod2.2 <- glmer(cbind(FLO.ABS, FLO.PRESENT - FLO.ABS) ~ P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+
+Model <- "mod2.2"
+Variable <- "S_LIGHT_TRMT + P_PLANT_SP"
+
+anova <- anova(mod2.2, mod2.2.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.2, mod2.2.light)
+
+# mod1.1 - without species
+mod1.1.light <- glmer(cbind(FLO.ABS, FLO.PRESENT - FLO.ABS) ~ S_LIGHT_TRMT + (1|S_STU.SI), data = SUBSET, family = binomial)
+mod1.1 <- glmer(cbind(FLO.ABS, FLO.PRESENT - FLO.ABS) ~ 1 + (1|S_STU.SI), data = SUBSET, family = binomial)
+
+Model <- "mod1.1"
+Variable <- "S_LIGHT_TRMT"
+
+anova <- anova(mod1.1, mod1.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1, mod1.1.light)
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+AIC.TABLE$d.AIC <- NA
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(i in (1:nrow(AIC.TABLE))){
+  
+  AIC.TABLE$d.AIC[i] <- round(AIC.TABLE$AIC[i] - AIC.min, 2)
+  
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+rm(AIC.TABLE, AIC, AIC.min, i, list, Model, Variable, anova.dAIC, anova.p, BIC, anova)
+#-------------------------------------------------------------------------------------------------------------
+
+# BEST MODEL
+#-----------
+
+# MODEL
+mod05.21 <- glmer(cbind(FLO.ABS, FLO.PRESENT - FLO.ABS) ~ S_LIGHT_TRMT * P_PLANT_SP + (1|S_STU.SI), data = SUBSET, family = binomial)
+qqnorm(residuals(mod05.21))
+qqline(residuals(mod05.21))
+
+# PRINT
+mod05.21.tbl <- tbl_regression(mod05.21, 
+                              intercept = T,
+                              pvalue_fun = ~ style_pvalue(.x, digits = 3),
+                              estimate_fun = ~ style_number(.x, digits = 3)) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**Eaten flowers ~ Light * Plant Sp. + (1|Study site)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+  
+knit_print(mod05.21.tbl)
+# print(mod05.21.tbl)
+
+# SAVE
+# gtsave(as_gt(mod05.21.tbl),
+#        file = file.path(paste0(HOME,"/mod03.13.tbl.png")))
+
+rm(mod05.21.tbl)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# POWER SIMULATION
+#-----------------
+
+nsim <- 10000
+
+SUBSET$P_PLANT_SP <- as.factor(SUBSET$P_PLANT_SP)
+n.level <- nlevels(SUBSET$P_PLANT_SP)
+PLANT.LS <- levels(SUBSET$P_PLANT_SP)
+
+# SIMULATION
+bsim <- sim(mod05.21, n.sim = nsim)
+
+# CALCULATE EFFECT SIZE
+#----------------------
+
+# EMPTY MATRIX
+effmat <- matrix(ncol = nsim, nrow = n.level)
+effmat[1,] <- bsim@fixef[, "S_LIGHT_TRMTLIT"]
+
+# FOR LOOP
+for(i in (2:n.level)){
+
+  # i <- 2
+  print(i)
+
+  effmat[i,] <- bsim@fixef[, "S_LIGHT_TRMTLIT"] +
+                bsim@fixef[, paste0("S_LIGHT_TRMTLIT:P_PLANT_SP", levels(SUBSET$P_PLANT_SP)[i])]
+}
+
+# CHECK COEFFICIENTS
+CI.FLO.ABS <- apply(effmat, 1, quantile, probs = c(0.05, 0.5, 0.95))
+CI.FLO.ABS <- cbind(rep("FLO.ABS", 3), CI.FLO.ABS)
+CI.FLO.ABS <- cbind(c(0.05, 0.5, 0.95), CI.FLO.ABS)
+
+kable(CI.FLO.ABS)
+
+rm(mod05.21, bsim, effmat, i, nsim)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MERGE MATRIX
+#--------------
+CI <- CI.FLO.ABS
+colnames(CI) <- c("Level", "DAMAGES", PLANT.LS)
+rownames(CI) <- NULL
+
+CI <- as.data.frame(CI)
+CI$Level <- as.numeric(CI$Level)
+
+CI <- CI[order(CI$Level),]
+
+# FORMAT CI
+#----------
+
+CI.coef <- data.frame(
+  "i.damages" = 9999,
+  "i.species" = 9999,
+  "i.2.5" = 9999,
+  "i.50" = 9999,
+  "i.97.5" = 9999,
+  "i.significant" = 9999)
+
+for(i in PLANT.LS){ 
+  
+  # i <- "Malva moschata"
+  
+  i.CI.coef <- CI.coef[1,]
+  i.2.5 <- CI[1, i]
+  i.50 <- CI[2, i]
+  i.97.5 <- CI[3, i]
+  
+  i.species <- i
+  i.damages <- unique(CI$DAMAGES)
+  
+  i.significant <- 0
+
+  i.CI.coef <- cbind(i.species, i.damages, i.2.5, i.50, i.97.5, i.significant)
+  CI.coef <- rbind(CI.coef, i.CI.coef)
+
+}
+
+# REMOVE FIRST LINE FULL OF NA's
+CI.coef <- CI.coef[-1,]
+
+# FORMAT
+CI.coef$i.2.5 <- as.numeric(CI.coef$i.2.5)
+CI.coef$i.50 <- as.numeric(CI.coef$i.50)
+CI.coef$i.97.5 <- as.numeric(CI.coef$i.97.5)
+
+# SIGNIFICANT IF IT TOUCH THE LINE
+for(i in (1:nrow(CI.coef))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    {(CI.coef$i.97.5[i] < 0 & CI.coef$i.2.5[i] < 0) | 
+     (CI.coef$i.97.5[i] > 0 & CI.coef$i.2.5[i] > 0)},
+    
+    # IF YES
+    CI.coef$i.significant[i] <- 1,
+   
+    # IF NO
+    CI.coef$i.significant[i] <- 0)  
+}
+
+rm(CI, CI.FLO.ABS, i.CI.coef)
+rm(i, i.2.5, i.50, i.97.5, i.damages, i.significant, i.species, PLANT.LS, n.level)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# SEGMENT PLOT
+#-------------
+
+`05.21_CI.FLO.ABS` <- ggplot() +
+  
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed") + 
+  geom_linerange(
+    data = CI.coef[CI.coef$i.damages == "FLO.ABS",],
+    aes(
+      x = i.species,
+      ymin = i.2.5,
+      ymax = i.97.5,
+      color = i.species),
+    linewidth = 4,
+    alpha = 0.5,
+    position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "FLO.ABS",],
+    aes(
+      x = i.species,
+      y = i.50,
+      color = i.species),
+    shape = 18,
+    size = 8,
+    position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "FLO.ABS" & CI.coef$i.significant == "0",],
+    aes(
+      x = i.species,
+      y = i.50),
+    color = "white",
+    shape = 18,
+    size = 6,
+    position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_classic() +
+  labs(
+    y = "Estimate",
+    x = "Species",
+    title = "Number of eaten flowers") +
+  scale_colour_manual(
+    values = COLOR.PALETTE) +
+  scale_y_continuous(
+    limits = c(-1.5, 1.5)) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.line = element_blank(),
+    # axis.text.y = element_text(size = 8, angle = 0, hjust = 0.5, face = "italic"),
+    axis.title.x = element_text(size = 8, face = "bold"),
+    axis.text.x = element_text(size = 8))
+
+# plot(`05.21_CI.FLO.ABS`)
+
+# ggsave(filename = paste0("05.21_CI.FLO.ABS.jpeg"),
+#          plot = `05.21_CI.FLO.ABS`, path = HOME,
+#          height = 8, width = 16, units = "cm")
+
+rm(CI.coef)
+
+##############################################################################################################
+
+# 05.22 SEVERITY OF EATEN FLOWERS
+#################################
+
+# SUBSET
+#-------
+THRESHOLD <- 0
+
+SUBSET <- DAMAGE #6192
+SUBSET <- SUBSET[SUBSET$DAMAGES > THRESHOLD ,] # 3533
+SUBSET <- SUBSET[SUBSET$TYPE == "FLOWER" ,] # 484
+
+# PLOT
+#-----
+`05.22_SEV_FLO` <- ggplot(
+  data = SUBSET, 
+  aes(
+    x = DAMAGES,
+    y = SPECIES,
+    fill = SPECIES,
+    pattern = TREA_LIGHT)) +
+  geom_boxplot_pattern(
+    color = "black",
+    pattern_fill = "white",
+    pattern_angle = 45,
+    pattern_density = 0.5,
+    pattern_color = NA,
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6) +
+  geom_jitter(
+    alpha = 0.3) +
+  scale_pattern_manual(
+    values = c("LIT" = "stripe", "DARK"  = "none"),
+    name = "Light treatment",
+    labels = c("Dark", "Light")) +       
+  scale_fill_manual(
+    values = COLOR.PALETTE) +
+  theme_minimal() +
+  guides(
+    fill = "none") +
+  labs(
+    title = "Severity of damaged flowers",
+    x = "Severity of damaged flowers [%]",
+    y = "Species") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.title.x = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 12),
+    axis.title.y = element_text(size = 16, face = "bold"),
+    axis.text.y = element_text(size = 12))
+
+plot(`05.22_SEV_FLO`)
+
+# ggsave(filename = "05.22_SEV_FLO.jpeg",
+#          plot = `05.22_SEV_FLO`, path = HOME,
+#          height = 16, width = 20, units = "cm")
+
+rm(`05.22_SEV_FLO`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MODEL SELECTION
+#----------------
+
+# Create an empty df
+AIC.TABLE <- data.frame(
+  "Model" = 9999,
+  "Variable" = 9999,
+  "anova.p" = 9999,
+  "anova.dAIC" = 9999,
+  "AIC" = 9999,
+  "BIC" = 9999)
+
+# mod2.1 - with interactions
+mod2.1.light <- lmer(DAMAGES ~ TREA_LIGHT * SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+mod2.1 <- lmer(DAMAGES ~ SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+
+Model <- "mod2.1"
+Variable <- "TREA_LIGHT * SPECIES"
+
+anova <- anova(mod2.1, mod2.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.1, mod2.1.light)
+
+# mod2.2 - without interactions
+mod2.2.light <- lmer(DAMAGES ~ TREA_LIGHT + SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+mod2.2 <- lmer(DAMAGES ~ SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+
+Model <- "mod2.2"
+Variable <- "TREA_LIGHT + SPECIES"
+
+anova <- anova(mod2.2, mod2.2.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod2.2, mod2.2.light)
+
+# mod1.1 - without species
+mod1.1.light <- lmer(DAMAGES ~ TREA_LIGHT + (1|STU.SI) + (1|LABEL), data = SUBSET)
+mod1.1 <- lmer(DAMAGES ~ 1 + (1|STU.SI) + (1|LABEL), data = SUBSET)
+
+Model <- "mod1.1"
+Variable <- "TREA_LIGHT"
+
+anova <- anova(mod1.1, mod1.1.light)
+anova.p <- round(anova$`Pr(>Chisq)`[2], 2)
+anova.dAIC <- round(as.numeric(anova$AIC[2] - anova$AIC[1]), 2)
+AIC <- round(as.numeric(anova$AIC[2]), 2)
+BIC <- round(as.numeric(anova$BIC[2]), 2)
+
+list <- c(Model, Variable, anova.p, anova.dAIC, AIC, BIC)
+AIC.TABLE <- rbind(AIC.TABLE, list)
+rm(mod1.1, mod1.1.light)
+
+# CLEAN & SORT
+#-------------
+
+# remove first line full of NA's
+AIC.TABLE <- AIC.TABLE[-1,]
+AIC.TABLE$d.AIC <- NA
+
+# dAIC
+AIC.TABLE$AIC <- as.numeric(AIC.TABLE$AIC)
+AIC.min <- AIC.TABLE$AIC[which.min(AIC.TABLE$AIC)]
+
+for(i in (1:nrow(AIC.TABLE))){
+
+  AIC.TABLE$d.AIC[i] <- round(AIC.TABLE$AIC[i] - AIC.min, 2)
+
+}
+
+AIC.TABLE$d.AIC <- as.numeric(AIC.TABLE$d.AIC)
+
+# SORT
+AIC.TABLE <- AIC.TABLE[order(AIC.TABLE$d.AIC),]
+kable(AIC.TABLE)
+
+rm(AIC.TABLE, AIC, AIC.min, i, list, Model, Variable, anova.dAIC, anova.p, BIC, anova)
+#-------------------------------------------------------------------------------------------------------------
+
+# BEST MODEL
+#-----------
+mod05.22 <- lmer(log(DAMAGES) ~ TREA_LIGHT * SPECIES + (1|STU.SI) + (1|LABEL), data = SUBSET)
+qqnorm(residuals(mod05.22))
+qqline(residuals(mod05.22))
+
+# PRINT
+`mod05.22.tbl` <- tbl_regression(mod05.22, 
+                                intercept = T,
+                                pvalue_fun = ~ style_pvalue(.x, digits = 3),
+                                estimate_fun = ~ style_number(.x, digits = 3)) %>%
+  
+  # ADD COLUMNS
+  modify_column_unhide(column = estimate) %>%
+  modify_column_unhide(column = std.error) %>%
+  modify_spanning_header(
+    c(estimate, std.error, ci) ~ 
+      "**Florivory severity ~ Light * Plant Sp. + (1|Study site) + (1|Label)**")  %>%
+
+  # ADD SIGNIFICANCE LEVELS
+  add_global_p() %>%
+  # add_significance_stars(hide_p = FALSE, pattern = "{p.value}{stars}") %>%
+    
+  # ADD BOLD & ITALIC
+  bold_labels() %>%
+  italicize_levels()
+
+knit_print(mod05.22.tbl)
+# print(mod05.22.tbl)
+
+# gtsave(as_gt(`mod05.22.tbl`),
+#        file = file.path(paste0(HOME,"/mod05.22.tbl.png")))
+
+rm(`mod05.22.tbl`)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# POWER SIMULATION
+#-----------------
+
+nsim <- 10000
+
+SUBSET$SPECIES <- as.factor(SUBSET$SPECIES)
+n.level <- nlevels(SUBSET$SPECIES)
+PLANT.LS <- levels(SUBSET$SPECIES)
+
+# SIMULATION
+bsim <- sim(mod05.22, n.sim = nsim)
+
+# CALCULATE EFFECT SIZE
+#----------------------
+
+# EMPTY MATRIX
+effmat <- matrix(ncol = nsim, nrow = n.level)
+effmat[1,] <- bsim@fixef[, "TREA_LIGHTLIT"]
+
+# FOR LOOP
+for(i in (2:n.level)){
+
+  # i <- 2
+
+  effmat[i,] <- bsim@fixef[, "TREA_LIGHTLIT"] +
+                bsim@fixef[, paste0("TREA_LIGHTLIT:SPECIES", levels(SUBSET$SPECIES)[i])]
+}
+
+# CHECK COEFFICIENTS
+CI.FLO.SEV <- apply(effmat, 1, quantile, probs = c(0.05, 0.5, 0.95))
+CI.FLO.SEV <- cbind(rep("FLO.SEV", 3), CI.FLO.SEV)
+CI.FLO.SEV <- cbind(c(0.05, 0.5, 0.95), CI.FLO.SEV)
+
+kable(CI.FLO.SEV)
+
+rm(mod05.22, bsim, effmat, i, nsim)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# MERGE MATRIX
+#--------------
+CI <- CI.FLO.SEV
+colnames(CI) <- c("Level", "DAMAGES", PLANT.LS)
+rownames(CI) <- NULL
+
+CI <- as.data.frame(CI)
+CI$Level <- as.numeric(CI$Level)
+
+CI <- CI[order(CI$Level),]
+
+# FORMAT CI
+#----------
+
+CI.coef <- data.frame(
+  "i.damages" = 9999,
+  "i.species" = 9999,
+  "i.2.5" = 9999,
+  "i.50" = 9999,
+  "i.97.5" = 9999,
+  "i.significant" = 9999)
+
+for(i in PLANT.LS){ 
+  
+  # i <- "Malva moschata"
+  
+  i.CI.coef <- CI.coef[1,]
+  i.2.5 <- CI[1, i]
+  i.50 <- CI[2, i]
+  i.97.5 <- CI[3, i]
+  
+  i.species <- i
+  i.damages <- unique(CI$DAMAGES)
+  
+  i.significant <- 0
+
+  i.CI.coef <- cbind(i.species, i.damages, i.2.5, i.50, i.97.5, i.significant)
+  CI.coef <- rbind(CI.coef, i.CI.coef)
+
+}
+
+# REMOVE FIRST LINE FULL OF NA's
+CI.coef <- CI.coef[-1,]
+
+# FORMAT
+CI.coef$i.2.5 <- as.numeric(CI.coef$i.2.5)
+CI.coef$i.50 <- as.numeric(CI.coef$i.50)
+CI.coef$i.97.5 <- as.numeric(CI.coef$i.97.5)
+
+# SIGNIFICANT IF IT TOUCH THE LINE
+for(i in (1:nrow(CI.coef))){
+  
+  # i <- 12
+  
+  ifelse(
+    
+    # ARGUMENT
+    {(CI.coef$i.97.5[i] < 0 & CI.coef$i.2.5[i] < 0) | 
+     (CI.coef$i.97.5[i] > 0 & CI.coef$i.2.5[i] > 0)},
+    
+    # IF YES
+    CI.coef$i.significant[i] <- 1,
+   
+    # IF NO
+    CI.coef$i.significant[i] <- 0)  
+}
+
+rm(CI, CI.FLO.SEV, i.CI.coef)
+rm(i, i.2.5, i.50, i.97.5, i.damages, i.significant, i.species, PLANT.LS, n.level)
+
+#-------------------------------------------------------------------------------------------------------------
+
+# SEGMENT PLOT
+#-------------
+
+`05.22_CI.FLO.SEV` <- ggplot() +
+  
+  geom_hline(yintercept = 0, linetype = "dashed") + 
+  geom_linerange(
+    data = CI.coef[CI.coef$i.damages == "FLO.SEV",],
+    aes(
+      x = i.species,
+      ymin = i.2.5,
+      ymax = i.97.5,
+      color = i.species),
+    size = 4,
+    alpha = 0.5,
+    position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "FLO.SEV",],
+    aes(
+      x = i.species,
+      y = i.50,
+      color = i.species),
+      shape = 18,
+      size = 8,
+      position = position_dodge(width = 0.5)) +
+  geom_point(
+    data = CI.coef[CI.coef$i.damages == "FLO.SEV" & CI.coef$i.significant == "0",],
+    aes(
+      x = i.species,
+      y = i.50),
+    color = "white",
+    shape = 18,
+    size = 6,
+    position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_classic() +
+  labs(
+    y = "Estimate",
+    x = "Species",
+    title = "Severity of eaten flowers") +
+  scale_colour_manual(
+    values = COLOR.PALETTE) +
+  scale_y_continuous(
+    limits = c(-1.5, 1.5)) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.line = element_blank(),
+    # axis.text.y = element_text(size = 8, angle = 0, hjust = 0.5, face = "italic"),
+    axis.title.x = element_text(size = 8, face = "bold"),
+    axis.text.x = element_text(size = 8))
+
+# plot(`05.22_CI.FLO.SEV`)
+
+# SAVE
+# ggsave(filename = paste0("05.22_CI.FLO.SEV.jpeg"),
+#          plot = `05.22_CI.FLO.SEV`, path = HOME,
+#          height = 8, width = 16, units = "cm")
+
+rm(CI.coef, THRESHOLD, SUBSET, COLOR.PALETTE)
+
+##############################################################################################################
+
+# FINAL PLOT
+#-----------
+
+`04_HERBIVORY_IN_SITU` <- grid.arrange(`05.11_CI.HERB.ABS`, 
+                                       `05.12_CI.HERB.SEV`, 
+                                       `05.21_CI.FLO.ABS`, 
+                                       `05.22_CI.FLO.SEV`, nrow = 1, widths = c(1.5,1,1,1))
+
+rm(`04_HERBIVORY_IN_SITU`, `05.11_CI.HERB.ABS`, `05.12_CI.HERB.SEV`, `05.21_CI.FLO.ABS`, `05.22_CI.FLO.SEV`)
+
+```
+
+# THE END
